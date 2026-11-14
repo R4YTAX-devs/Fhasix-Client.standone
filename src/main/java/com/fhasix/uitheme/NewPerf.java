@@ -8,7 +8,7 @@ import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.option.CloudRenderMode;
 import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.option.GraphicsMode;
-import net.minecraft.client.option.ParticlesMode;
+import net.minecraft.particle.ParticlesMode;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ExperienceOrbEntity;
 import net.minecraft.entity.decoration.AbstractDecorationEntity;
@@ -51,13 +51,14 @@ public final class NewPerf {
     static final int BACKGROUND = 10;
     static final int TEXTURE = 11;
     static final int MENU = 12;
-    static final int COUNT = 13;
+    static final int FOG = 13;
+    static final int COUNT = 14;
 
     static final String[] IDS = {"particles", "culling", "lazy", "render", "sim", "entity", "visual",
-            "frame", "effects", "hud", "background", "texture", "menu"};
+            "frame", "effects", "hud", "background", "texture", "menu", "fog"};
     static final String[] LABELS = {"Particles", "Culling", "Lazy Chunk Loading", "Render Distance",
             "Simulation Distance", "Entity Detail", "Visual Details", "Frame Rate", "Effects & Animations",
-            "HUD Optimizer", "Background Limiter", "Texture Detail", "Menu FPS Saver"};
+            "HUD Optimizer", "Background Limiter", "Texture Detail", "Menu FPS Saver", "Fog Optimizer"};
     static final String[] LEVELS = {"Small", "Medium", "High"};
     static final String[][] DESC = {
             {"Hides potion and spell effect particles.",
@@ -87,9 +88,9 @@ public final class NewPerf {
             {"No view bobbing.",
                     "No bobbing, FOV effects, distortion effects or menu blur.",
                     "Everything from Medium, plus no enchant glint animation. Most FPS."},
-            {"Fhasix overlays (hitboxes, health, TNT timer) draw fewer things, no UI fade animations.",
-                    "Fhasix overlays draw very few things and over a short range.",
-                    "Every extra Fhasix overlay is switched off. Most FPS."},
+            {"No UI fade animations in the Fhasix menus. Overlays keep working.",
+                    "Also draws a few fewer things in the overlays (health, TNT timer). They never switch off.",
+                    "Overlays use a slightly shorter range. Hitboxes, health and every HUD mod you turned on keep working."},
             {"Lowers the priority of loading and download threads a little.",
                     "Lowers background loading threads a lot so the game thread comes first.",
                     "Background loading gets the lowest priority there is. Most FPS."},
@@ -98,12 +99,22 @@ public final class NewPerf {
                     "No mipmaps: the cheapest textures. Textures reload once when you change this. Most FPS."},
             {"Caps the frame rate at 60 while a menu is open, so menus use less power.",
                     "Caps the frame rate at 30 while a menu is open.",
-                    "Caps the frame rate at 15 while a menu is open. Gameplay FPS is not touched."}
+                    "Caps the frame rate at 15 while a menu is open. Gameplay FPS is not touched."},
+            {"Brings the fog in to 60% of its distance, with the normal fog colour, so far chunks are hidden early. More FPS.",
+                    "Brings the fog in to 60% of its distance, with the normal fog colour, so far chunks are hidden early. More FPS.",
+                    "Brings the fog in to 60% of its distance, with the normal fog colour, so far chunks are hidden early. More FPS."}
     };
     /** Which tab of the Performance screen a mode is on: 1 = World, 2 = Video, 3 = System. */
-    static final int[] TAB = {1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 2, 3};
-    static final int[] ICON = {37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49};
-    static final boolean[] NEWBADGE = {false, false, false, false, false, false, false, true, true, true, true, true, true};
+    static final int[] TAB = {1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 2, 3, 2};
+    static final int[] ICON = {37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 49};
+    static final boolean[] NEWBADGE = {false, false, false, false, false, false, false, true, true, true, true, true, true, false};
+
+    /** Modes that are a single On/Off switch (no Low / Medium / High): the Fog Optimizer. */
+    static final boolean[] TOGGLE_ONLY = new boolean[COUNT];
+
+    static {
+        TOGGLE_ONLY[FOG] = true;
+    }
 
     /** One card per mode in the Performance view of the Mod Menu (ids are "perf_" + mode id). */
     static final java.util.List<NewModSettings.ModDef> DEFS = new java.util.ArrayList<>();
@@ -139,7 +150,16 @@ public final class NewPerf {
      * Cached state per mode: -1 = off, 0..2 = on at that value. Refreshed every tick and on every change, so the
      * per-particle / per-entity checks are plain array reads (no settings lookup, no string building).
      */
-    private static final int[] CACHE = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    private static final int[] CACHE = new int[COUNT];
+
+    static {
+        java.util.Arrays.fill(CACHE, -1);
+    }
+
+    /** True while the Fog Optimizer switch is on (read by NewFog every frame: a plain array read). */
+    static boolean fogOptimizer() {
+        return CACHE[FOG] >= 0;
+    }
 
     private static void refreshCache(MinecraftClient c) {
         for (int m = 0; m < COUNT; m++) {
@@ -221,10 +241,22 @@ public final class NewPerf {
     private static Integer origMip;
     private static Integer menuPrev;
     private static int tickCount = 0;
+    private static boolean menuMigrated = false;
 
     static void tick(MinecraftClient c) {
         if (c == null || c.options == null) {
             return;
+        }
+        if (!menuMigrated) {
+            menuMigrated = true;
+            NewSafe.run("perf_menu_migrate", () -> {
+                // one-time: switch Menu FPS Saver off for players who already picked a device before this update
+                if (NewModSettings.opt(c, MOD, "menu_off_v1") == 0) {
+                    NewModSettings.setOpt(c, MOD, IDS[MENU] + ".on", 0);
+                    NewModSettings.setOpt(c, MOD, "menu_off_v1", 1);
+                    NewModSettings.save(c);
+                }
+            });
         }
         refreshCache(c);
         // never touch video options while the game is still loading (changing them starts a reload)
@@ -475,10 +507,10 @@ public final class NewPerf {
                 enable = m <= LAZY; // particles, culling, lazy chunks - small
                 lvl = 0;
             } else if (device == DEVICE_MEDIUM) {
-                enable = true;
+                enable = m != MENU; // Menu FPS Saver stays OFF by default - it made the menus laggy
                 lvl = 1;
             } else {
-                enable = true;
+                enable = m != MENU;
                 lvl = 2;
             }
             NewModSettings.setOpt(c, MOD, IDS[m] + ".on", enable ? 1 : 0);
@@ -498,21 +530,24 @@ public final class NewPerf {
         return CACHE[HUD];
     }
 
-    /** How many things a Fhasix overlay may draw: normal when the HUD Optimizer is off, fewer when on, 0 at High. */
+    /**
+     * How many things a Fhasix overlay may draw. The HUD Optimizer can make this a bit smaller but it NEVER
+     * reaches 0: a mod the player switched on (health indicator, TNT timer, hitbox...) must keep working.
+     */
     public static int overlayCap(int normal) {
         int l = hudLevel(MinecraftClient.getInstance());
-        return l < 0 ? normal : l == 0 ? Math.max(1, normal / 2) : l == 1 ? Math.max(1, normal / 4) : 0;
+        return l < 1 ? normal : l == 1 ? Math.max(4, normal * 3 / 4) : Math.max(4, normal / 2);
     }
 
-    /** Overlay range in blocks: shorter when the HUD Optimizer is on. */
+    /** Overlay range in blocks: only slightly shorter at the highest HUD Optimizer level. */
     public static double overlayRange(double normal) {
         int l = hudLevel(MinecraftClient.getInstance());
-        return l < 0 ? normal : l == 0 ? normal * 0.7 : normal * 0.4;
+        return l < 2 ? normal : normal * 0.85;
     }
 
-    /** True at HUD Optimizer High: the extra Fhasix overlays are not drawn at all. */
+    /** Never true any more: the HUD Optimizer no longer switches overlays off. */
     public static boolean overlaysOff() {
-        return hudLevel(MinecraftClient.getInstance()) >= 2;
+        return false;
     }
 
     /** True while the HUD Optimizer is on: Fhasix UI fade animations jump straight to their end value. */

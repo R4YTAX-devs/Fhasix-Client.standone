@@ -59,8 +59,11 @@ public final class a1 {
             return;
         }
 
-        for (int col = r; col < width - r; col++) {
-            fillGradientColumnRange(context, x, y, col, col + 1, 0, height, width, height, topLeft, bottomRight, alpha);
+        // One strip per ~span/64 columns (never one fill per column): the colour change across a strip is
+        // far below one shade, so it looks identical but costs a fraction of the draw calls.
+        int step = Math.max(1, (int) Math.ceil((width - 2 * r) / 64.0));
+        for (int col = r; col < width - r; col += step) {
+            fillGradientColumnRange(context, x, y, col, Math.min(col + step, width - r), 0, height, width, height, topLeft, bottomRight, alpha);
         }
         for (int col = 0; col < r; col++) {
             fillGradientColumnRange(context, x, y, col, col + 1, r, height - r, width, height, topLeft, bottomRight, alpha);
@@ -98,19 +101,34 @@ public final class a1 {
                                     float ccx, float ccy, int r, int width, int height,
                                     int[] topLeft, int[] bottomRight, int alpha) {
         for (int dy = 0; dy < r; dy++) {
-            for (int dx = 0; dx < r; dx++) {
-                int px = boxX + dx;
-                int py = boxY + dy;
-                float sampleX = px + 0.5f;
-                float sampleY = py + 0.5f;
-                float dist = (float) Math.sqrt((sampleX - ccx) * (sampleX - ccx) + (sampleY - ccy) * (sampleY - ccy));
-                float coverage = clamp(r - dist + 0.5f, 0f, 1f);
-                if (coverage <= 0f) continue;
-                float xFrac = px / (float) Math.max(1, width - 1);
-                float yFrac = py / (float) height;
-                int[] c = gradientAt(xFrac, yFrac, topLeft, bottomRight);
-                int a = Math.round(coverage * alpha);
-                context.fill(x + px, y + py, x + px + 1, y + py + 1, argb(a, c));
+            int py = boxY + dy;
+            float sampleY = py + 0.5f;
+            int runStart = -1;
+            for (int dx = 0; dx <= r; dx++) {
+                float coverage = -1f;
+                if (dx < r) {
+                    float sampleX = boxX + dx + 0.5f;
+                    float dist = (float) Math.sqrt((sampleX - ccx) * (sampleX - ccx) + (sampleY - ccy) * (sampleY - ccy));
+                    coverage = clamp(r - dist + 0.5f, 0f, 1f);
+                }
+                if (coverage >= 0.999f) {
+                    if (runStart < 0) runStart = dx;
+                    continue;
+                }
+                if (runStart >= 0) {
+                    int px0 = boxX + runStart;
+                    int px1 = boxX + dx;
+                    float xFrac = ((px0 + px1) / 2f) / (float) Math.max(1, width - 1);
+                    int[] c = gradientAt(xFrac, py / (float) height, topLeft, bottomRight);
+                    context.fill(x + px0, y + py, x + px1, y + py + 1, argb(alpha, c));
+                    runStart = -1;
+                }
+                if (dx < r && coverage > 0f) {
+                    int px = boxX + dx;
+                    float xFrac = px / (float) Math.max(1, width - 1);
+                    int[] c = gradientAt(xFrac, py / (float) height, topLeft, bottomRight);
+                    context.fill(x + px, y + py, x + px + 1, y + py + 1, argb(Math.round(coverage * alpha), c));
+                }
             }
         }
     }

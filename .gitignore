@@ -1,20 +1,6 @@
-# Gradle / Loom
-.gradle/
 build/
-out/
+.gradle/
 run/
-*.log
-hs_err_pid*
-
-# IDE
 .idea/
-*.iml
-.vscode/
-.classpath
-.project
-.settings/
-bin/
-
-# OS
-.DS_Store
-Thumbs.db
+*.log
+local.properties

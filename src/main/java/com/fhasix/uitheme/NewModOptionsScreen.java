@@ -46,6 +46,10 @@ public final class NewModOptionsScreen extends Screen {
     /** 0 = none, 1 = dragging the saturation/brightness square, 2 = dragging the hue bar. */
     private int pickDrag = 0;
     private int pickRow = -1;
+    /** Eased 0..1 position of each toggle switch (0 = off, 1 = on) so the knob slides and the colours fade. */
+    private final java.util.Map<Integer, Float> toggleAnim = new java.util.HashMap<>();
+    private long animLast = System.nanoTime();
+    private float animDt = 0f;
 
     NewModOptionsScreen(NewModMenuScreen menu, NewModSettings.ModDef mod) {
         super(Text.literal(mod.name + " settings"));
@@ -175,40 +179,71 @@ public final class NewModOptionsScreen extends Screen {
 
     // ---------------------------------------------------------------- render
 
+    private float fs(float design) {
+        return design * k;
+    }
+
+    /** Segment width for a CHOICE with few, short options; -1 = use the single cycling button instead. */
+    private int segmentWidth(NewModOptions.Opt o, int[] r) {
+        int n = o.choices.length;
+        if (n < 2 || n > 4) {
+            return -1;
+        }
+        int gap = Math.max(2, sl(5));
+        int segW = (r[2] - (n - 1) * gap) / n;
+        float sz = fs(14f);
+        for (String ch : o.choices) {
+            if (NewFont.widthUi(textRenderer, ch, NewFont.W_MED, sz) + sl(16) > segW) {
+                return -1;
+            }
+        }
+        return segW;
+    }
+
     private void button(DrawContext c, int[] r, boolean hov, int rad) {
         NewUi.rrect(c, r[0], r[1], r[2], r[3], rad, hov ? NewUi.HOV_T : NewUi.BTN_T, hov ? NewUi.HOV_B : NewUi.BTN_B);
     }
 
     private void centered(DrawContext c, String s, int[] r, int color) {
-        c.drawText(textRenderer, s, r[0] + (r[2] - textRenderer.getWidth(s)) / 2,
-                r[1] + (r[3] - textRenderer.fontHeight) / 2, color, false);
+        float sz = fs(15f);
+        NewFont.drawUi(c, textRenderer, s, r[0] + (r[2] - NewFont.widthUi(textRenderer, s, NewFont.W_MED, sz)) / 2,
+                NewFont.centerYUi(r[1], r[3], sz), color, NewFont.W_MED, sz);
     }
 
     @Override
     public void render(DrawContext c, int mx, int my, float delta) {
+        long animNow = System.nanoTime();
+        animDt = Math.min(0.1f, (animNow - animLast) / 1_000_000_000f);
+        animLast = animNow;
         if (menu.backdrop() != null) {
-            menu.backdrop().render(c, -1000, -1000, delta);
+            NewModMenuScreen.drawTitleBackdrop(c, width, height); // same backdrop as the Mod Menu (title buttons hidden)
         } else {
             safeBackground(c, mx, my, delta);
+            c.fill(0, 0, width, height, 0x30000000);
         }
-        c.fill(0, 0, width, height, menu.backdrop() != null ? 0x42000000 : 0x30000000);
 
         NewUi.frame(c, panel[0], panel[1], panel[2], panel[3], Math.max(3, sl(14)), NewUi.CARD_BORDER, NewUi.PANEL_T, NewUi.PANEL_B);
-        c.drawText(textRenderer, Text.literal(mod.name + " settings").formatted(Formatting.BOLD),
-                sx((DW - PW) / 2 + 36), panel[1] + sl(36), NewUi.TXT, false);
-        c.drawText(textRenderer, "Changes apply instantly", sx((DW - PW) / 2 + 36), panel[1] + sl(36) + textRenderer.fontHeight + sl(8),
-                NewUi.TXT_DIM, false);
+        NewUi.accent(c, panel[0], panel[1], panel[2], panel[3], Math.max(3, sl(14)), 0.20f);
+        float hsz = fs(22f);
+        float ssz = fs(14.5f);
+        int titleX = sx((DW - PW) / 2 + 36);
+        NewFont.drawUi(c, textRenderer, mod.name + " settings", titleX, NewFont.centerYUi(panel[1] + sl(36), sl(28), hsz),
+                NewUi.TXT, NewFont.W_BOLD, hsz);
+        NewFont.drawUi(c, textRenderer, "Changes apply instantly", titleX, NewFont.centerYUi(panel[1] + sl(36) + sl(36), sl(20), ssz),
+                NewUi.TXT_DIM, NewFont.W_REG, ssz);
 
         boolean bh = NewUi.in(mx, my, backBtn[0], backBtn[1], backBtn[2], backBtn[3]);
         button(c, backBtn, bh, Math.max(3, sl(10)));
-        centered(c, "< Back", backBtn, NewUi.TXT);
+        centered(c, "Back", backBtn, NewUi.TXT);
 
+        float lsz = fs(16f);
         for (int i = 0; i < opts.size(); i++) {
             NewModOptions.Opt o = opts.get(i);
             int[] rr = rowRect[i];
             NewUi.frame(c, rr[0], rr[1], rr[2], rr[3], Math.max(3, sl(10)), NewUi.CARD_BORDER, NewUi.CARD_T, NewUi.CARD_B);
-            int labelY = o.type == NewModOptions.PICKER ? rr[1] + sl(20) : rr[1] + (rr[3] - textRenderer.fontHeight) / 2;
-            c.drawText(textRenderer, o.label, rr[0] + sl(24), labelY, NewUi.TXT, false);
+            int labelY = o.type == NewModOptions.PICKER ? NewFont.centerYUi(rr[1] + sl(20), sl(20), lsz)
+                    : NewFont.centerYUi(rr[1], rr[3], lsz);
+            NewFont.drawUi(c, textRenderer, o.label, rr[0] + sl(24), labelY, 0xFFC4C6CC, NewFont.W_MED, lsz);
             drawControl(c, i, o, mx, my);
         }
     }
@@ -224,30 +259,81 @@ public final class NewModOptionsScreen extends Screen {
                 break;
             }
             case NewModOptions.TOGGLE: {
+                // switch: the knob slides and the colours fade between off (grey) and on (green)
                 boolean on = v != 0;
-                if (on) {
-                    NewUi.rrect(c, r[0], r[1], r[2], r[3], rad, hov ? NewUi.ON_HT : NewUi.ON_T, hov ? NewUi.ON_HB : NewUi.ON_B);
+                float tgt = on ? 1f : 0f;
+                float cur = toggleAnim.getOrDefault(i, tgt);
+                if (NewPerf.animationsOff()) {
+                    cur = tgt;
                 } else {
-                    button(c, r, hov, rad);
+                    cur += (tgt - cur) * Math.min(1f, animDt * 14f);
+                    if (Math.abs(tgt - cur) < 0.004f) {
+                        cur = tgt;
+                    }
                 }
-                centered(c, on ? "On" : "Off", r, on ? NewUi.TXT_ON : NewUi.TXT_DIM);
+                toggleAnim.put(i, cur);
+                float e = cur * cur * (3f - 2f * cur);
+                int swH = Math.max(8, Math.round(r[3] * 0.62f));
+                int swW = Math.round(swH * 1.9f);
+                int swX = r[0] + r[2] - swW;
+                int swY = r[1] + (r[3] - swH) / 2;
+                int pad = Math.max(2, swH / 6);
+                int kd = swH - pad * 2;
+                int offTrackT = hov ? NewUi.rgb(62, 65, 72) : NewUi.rgb(46, 48, 54);
+                int offTrackB = hov ? NewUi.rgb(56, 59, 66) : NewUi.rgb(41, 43, 49);
+                int onTrackT = hov ? NewUi.ON_HT : NewUi.ON_T;
+                int onTrackB = hov ? NewUi.ON_HB : NewUi.ON_B;
+                NewUi.rrect(c, swX, swY, swW, swH, swH / 2, NewUi.lerp(offTrackT, onTrackT, e), NewUi.lerp(offTrackB, onTrackB, e));
+                int knobX = swX + pad + Math.round((swW - kd - pad * 2) * e);
+                int kt = NewUi.lerp(hov ? NewUi.rgb(146, 148, 154) : NewUi.rgb(128, 130, 136), NewUi.rgb(72, 205, 86), e);
+                int kb = NewUi.lerp(hov ? NewUi.rgb(130, 132, 138) : NewUi.rgb(112, 114, 120), NewUi.rgb(58, 178, 72), e);
+                NewUi.rrect(c, knobX, swY + pad, kd, kd, kd / 2, kt, kb);
                 break;
             }
             case NewModOptions.CHOICE: {
-                button(c, r, hov, rad);
-                centered(c, "< " + o.choices[Math.max(0, Math.min(o.choices.length - 1, v))] + " >", r, NewUi.TXT);
+                int segW = segmentWidth(o, r);
+                float csz = fs(14f);
+                if (segW < 0) {
+                    button(c, r, hov, rad);
+                    centered(c, o.choices[Math.max(0, Math.min(o.choices.length - 1, v))], r, NewUi.TXT);
+                } else {
+                    int gap = Math.max(2, sl(5));
+                    for (int j = 0; j < o.choices.length; j++) {
+                        int[] sr = {r[0] + j * (segW + gap), r[1], segW, r[3]};
+                        boolean sh = NewUi.in(mx, my, sr[0], sr[1], sr[2], sr[3]);
+                        boolean sel = j == v;
+                        if (sel) {
+                            NewUi.rrect(c, sr[0], sr[1], sr[2], sr[3], rad, sh ? NewUi.redHT() : NewUi.redT(), sh ? NewUi.redHB() : NewUi.redB());
+                        } else {
+                            button(c, sr, sh, rad);
+                        }
+                        NewFont.drawUi(c, textRenderer, o.choices[j],
+                                sr[0] + (sr[2] - NewFont.widthUi(textRenderer, o.choices[j], sel ? NewFont.W_BOLD : NewFont.W_MED, csz)) / 2,
+                                NewFont.centerYUi(sr[1], sr[3], csz), sel ? NewUi.TXT : NewUi.TXT_DIM,
+                                sel ? NewFont.W_BOLD : NewFont.W_MED, csz);
+                    }
+                }
                 break;
             }
             case NewModOptions.SLIDER: {
+                // thin track, red fill, red dot, and the value in a small dark badge on the right
                 float t = (v - o.min) / (float) Math.max(1, o.max - o.min);
-                NewUi.rrect(c, r[0], r[1], r[2], r[3], Math.max(1, r[3] / 2), NewUi.BTN_T, NewUi.BTN_B);
-                int fw = Math.max(r[3], Math.round(r[2] * t));
-                NewUi.rrect(c, r[0], r[1], fw, r[3], Math.max(1, r[3] / 2), NewUi.RED_T, NewUi.RED_B);
-                int ks = Math.max(6, sl(26));
+                int th = Math.max(2, sl(5));
+                int ty = r[1] + (r[3] - th) / 2;
+                NewUi.rrect(c, r[0], ty, r[2], th, th / 2, NewUi.rgb(40, 42, 48), NewUi.rgb(36, 38, 44));
+                int fw = Math.max(th, Math.round(r[2] * t));
+                NewUi.rrect(c, r[0], ty, fw, th, th / 2, NewUi.redT(), NewUi.redB());
+                int ks = Math.max(6, sl(18));
                 int kx = r[0] + Math.round((r[2] - ks) * t);
-                NewUi.rrect(c, kx, r[1] + (r[3] - ks) / 2, ks, ks, ks / 2, 0xFFFFFFFF, 0xFFD8DADF);
+                NewUi.rrect(c, kx, r[1] + (r[3] - ks) / 2, ks, ks, ks / 2, NewUi.redHT(), NewUi.redT());
                 String vs = v + o.suffix;
-                c.drawText(textRenderer, vs, r[0] + r[2] + sl(18), r[1] + (r[3] - textRenderer.fontHeight) / 2, NewUi.TXT, false);
+                float bsz = fs(13.5f);
+                int bw = NewFont.widthUi(textRenderer, vs, NewFont.W_MED, bsz) + sl(18);
+                int bh2 = Math.max(10, sl(30));
+                int bx = r[0] + r[2] + sl(14);
+                NewUi.rrect(c, bx, r[1] + (r[3] - bh2) / 2, bw, bh2, Math.max(3, sl(7)), NewUi.BTN_T, NewUi.BTN_B);
+                NewFont.drawUi(c, textRenderer, vs, bx + sl(9), NewFont.centerYUi(r[1] + (r[3] - bh2) / 2, bh2, bsz),
+                        NewUi.TXT, NewFont.W_MED, bsz);
                 break;
             }
             default: {
@@ -307,7 +393,7 @@ public final class NewModOptionsScreen extends Screen {
         // current colour + hex
         NewUi.frame(c, sw[0], sw[1], sw[2], sw[3], Math.max(2, sl(8)), border, cur, cur);
         String hex = String.format(java.util.Locale.ROOT, "#%06X", cur & 0xFFFFFF);
-        c.drawText(textRenderer, hex, sw[0], sw[1] + sw[3] + sl(14), NewUi.TXT_DIM, false);
+        NewFont.drawUi(c, textRenderer, hex, sw[0], NewFont.centerYUi(sw[1] + sw[3] + sl(8), sl(20), fs(14f)), NewUi.TXT_DIM, NewFont.W_MED, fs(14f));
     }
 
     private static float clamp01(double v) {
@@ -397,6 +483,7 @@ public final class NewModOptionsScreen extends Screen {
         double mx = click.x();
         double my = click.y();
         if (NewUi.in(mx, my, backBtn[0], backBtn[1], backBtn[2], backBtn[3])) {
+            NewUi.click(client);
             back();
             return true;
         }
@@ -427,12 +514,23 @@ public final class NewModOptionsScreen extends Screen {
             int v = value(o);
             switch (o.type) {
                 case NewModOptions.TOGGLE:
+                    NewUi.click(client);
                     set(o, v == 0 ? 1 : 0, true);
                     break;
-                case NewModOptions.CHOICE:
-                    set(o, (v + 1) % o.choices.length, true);
+                case NewModOptions.CHOICE: {
+                    NewUi.click(client);
+                    int segW = segmentWidth(o, r);
+                    if (segW < 0) {
+                        set(o, (v + 1) % o.choices.length, true);
+                    } else {
+                        int gap = Math.max(2, sl(5));
+                        int idx = (int) ((mx - r[0]) / (segW + gap));
+                        set(o, Math.max(0, Math.min(o.choices.length - 1, idx)), true);
+                    }
                     break;
+                }
                 case NewModOptions.SLIDER:
+                    NewUi.click(client);
                     sliderDrag = i;
                     sliderTo(i, mx);
                     break;
@@ -442,6 +540,7 @@ public final class NewModOptionsScreen extends Screen {
                     for (int j = 0; j < n; j++) {
                         int sxp = r[0] + j * (sw + sl(8));
                         if (NewUi.in(mx, my, sxp - sl(4), r[1], sw + sl(8), r[3])) {
+                            NewUi.click(client);
                             set(o, j, true);
                             break;
                         }

@@ -1060,7 +1060,7 @@ public class SkinPopupScreen extends Screen {
     // =========================================================================================
 
     private void drawStr(DrawContext c, String s, int x, int y, int color) {
-        c.drawText(textRenderer, s, x, y, color, false);
+        NewFont.draw(c, textRenderer, s, x, y, color, false);
     }
 
     /** Text with alpha - skipped below ~4% because very low alpha would render fully opaque. */
@@ -1083,7 +1083,7 @@ public class SkinPopupScreen extends Screen {
     }
 
     private int strW(String s) {
-        return textRenderer.getWidth(s);
+        return NewFont.width(textRenderer, s);
     }
 
     private String ellipsize(String s, int maxW) {

@@ -49,6 +49,12 @@ public final class NewHud {
     public static final String BLOCK_INDICATOR = "block_indicator";
     public static final String ATTACK_INDICATOR = "attack_indicator";
     public static final String DIRECTION = "direction";
+    public static final String PING = "ping";
+    public static final String SERVER_ADDRESS = "server_address";
+    public static final String PLAYTIME = "playtime";
+    public static final String COMBO = "combo_display";
+    public static final String REACH = "reach_display";
+    public static final String PACK = "pack_display";
 
     private static final EquipmentSlot[] ARMOR = {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
@@ -603,6 +609,183 @@ public final class NewHud {
         }
     }
 
+    // --- Ping / Server Address / Playtime / Combo / Reach / Pack Display: one line of text in a box
+
+    private static final long SESSION_START = System.currentTimeMillis();
+    private static int combo;
+    private static long lastHitMs;
+    private static double lastReach = -1.0;
+    private static int lastHurtTime;
+
+    /** A hit on something living: grows the combo and remembers how far away the target was. */
+    static void onAttack(net.minecraft.entity.player.PlayerEntity p, net.minecraft.entity.Entity e) {
+        if (!(e instanceof net.minecraft.entity.LivingEntity)) {
+            return;
+        }
+        combo++;
+        lastHitMs = System.currentTimeMillis();
+        net.minecraft.util.math.Box b = e.getBoundingBox();
+        net.minecraft.util.math.Vec3d eye = p.getEyePos();
+        double dx = Math.max(Math.max(b.minX - eye.x, 0.0), eye.x - b.maxX);
+        double dy = Math.max(Math.max(b.minY - eye.y, 0.0), eye.y - b.maxY);
+        double dz = Math.max(Math.max(b.minZ - eye.z, 0.0), eye.z - b.maxZ);
+        lastReach = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /** The combo resets when you get hurt or stop hitting for 3 seconds. */
+    private static void tickStats(MinecraftClient c) {
+        if (c.player == null) {
+            combo = 0;
+            lastHurtTime = 0;
+            return;
+        }
+        int hurt = c.player.hurtTime;
+        if (hurt > lastHurtTime) {
+            combo = 0;
+        }
+        lastHurtTime = hurt;
+        if (combo > 0 && System.currentTimeMillis() - lastHitMs > 3000L) {
+            combo = 0;
+        }
+    }
+
+    private abstract static class TextEl extends El {
+        TextEl(String id, float defX, float defY) {
+            super(id, defX, defY);
+        }
+
+        /** The text to show, or null for nothing. */
+        abstract String text(MinecraftClient c, boolean preview);
+
+        @Override
+        int[] size(MinecraftClient c, boolean preview) {
+            String t = text(c, preview);
+            if (t == null) {
+                return null;
+            }
+            return new int[]{c.textRenderer.getWidth(t) + 10, c.textRenderer.fontHeight + 6};
+        }
+
+        @Override
+        void draw(DrawContext g, MinecraftClient c, int x, int y, int w, int h, boolean preview) {
+            String t = text(c, preview);
+            if (t == null) {
+                return;
+            }
+            shadowBox(g, c, id, x, y, w, h);
+            g.drawText(c.textRenderer, t, x + 5, y + 3, textColor(c, id), textShadow(c, id));
+        }
+    }
+
+    private static final class PingEl extends TextEl {
+        PingEl(float x, float y) {
+            super(PING, x, y);
+        }
+
+        @Override
+        String text(MinecraftClient c, boolean preview) {
+            int ms = 0;
+            net.minecraft.client.network.ClientPlayNetworkHandler h = c.getNetworkHandler();
+            if (h != null && c.player != null) {
+                net.minecraft.client.network.PlayerListEntry e = h.getPlayerListEntry(c.player.getUuid());
+                if (e != null) {
+                    ms = e.getLatency();
+                }
+            } else if (!preview) {
+                return null;
+            } else {
+                ms = 42;
+            }
+            return NewModSettings.optBool(c, id, "label") ? ms + " ms" : String.valueOf(ms);
+        }
+    }
+
+    private static final class ServerAddressEl extends TextEl {
+        ServerAddressEl(float x, float y) {
+            super(SERVER_ADDRESS, x, y);
+        }
+
+        @Override
+        String text(MinecraftClient c, boolean preview) {
+            net.minecraft.client.network.ServerInfo si = c.getCurrentServerEntry();
+            String a = si != null ? si.address : (c.isInSingleplayer() ? "Singleplayer" : (preview ? "play.fhasix.net" : null));
+            if (a == null) {
+                return null;
+            }
+            return NewModSettings.optBool(c, id, "label") ? "Server: " + a : a;
+        }
+    }
+
+    private static final class PlaytimeEl extends TextEl {
+        PlaytimeEl(float x, float y) {
+            super(PLAYTIME, x, y);
+        }
+
+        @Override
+        String text(MinecraftClient c, boolean preview) {
+            long s = (System.currentTimeMillis() - SESSION_START) / 1000L;
+            if (NewModSettings.optBool(c, id, "seconds")) {
+                return String.format(java.util.Locale.ROOT, "%02dh %02dm %02ds", s / 3600, (s / 60) % 60, s % 60);
+            }
+            return String.format(java.util.Locale.ROOT, "%02dh %02dm", s / 3600, (s / 60) % 60);
+        }
+    }
+
+    private static final class ComboEl extends TextEl {
+        ComboEl(float x, float y) {
+            super(COMBO, x, y);
+        }
+
+        @Override
+        String text(MinecraftClient c, boolean preview) {
+            int n = preview && combo == 0 ? 7 : combo;
+            return NewModSettings.optBool(c, id, "label") ? n + " Combo" : String.valueOf(n);
+        }
+    }
+
+    private static final class ReachEl extends TextEl {
+        ReachEl(float x, float y) {
+            super(REACH, x, y);
+        }
+
+        @Override
+        String text(MinecraftClient c, boolean preview) {
+            double r = preview && lastReach < 0 ? 3.12 : Math.max(0.0, lastReach);
+            String v = String.format(java.util.Locale.ROOT, "%.2f", r);
+            return NewModSettings.optBool(c, id, "label") ? v + " blocks" : v;
+        }
+    }
+
+    private static final class PackEl extends TextEl {
+        PackEl(float x, float y) {
+            super(PACK, x, y);
+        }
+
+        @Override
+        String text(MinecraftClient c, boolean preview) {
+            String name = null;
+            try {
+                for (net.minecraft.resource.ResourcePackProfile p : c.getResourcePackManager().getEnabledProfiles()) {
+                    String pid = p.getId();
+                    if (pid.equals("vanilla") || pid.startsWith("fabric") || pid.startsWith("mod_resources")
+                            || pid.startsWith("mod/") || pid.contains("fhasix")) {
+                        continue;
+                    }
+                    name = p.getDisplayName().getString(); // the last one is the top-priority pack
+                }
+            } catch (Exception ignored) {
+                name = null;
+            }
+            if (name == null) {
+                name = preview ? "Faithful 64x" : "Default";
+            }
+            if (name.length() > 24) {
+                name = name.substring(0, 23) + "..";
+            }
+            return NewModSettings.optBool(c, id, "label") ? "Pack: " + name : name;
+        }
+    }
+
     private static final El[] ELEMENTS = {
             new Counter(FPS, true, 0.012f, 0.02f),
             new Counter(CPS, false, 0.012f, 0.085f),
@@ -613,7 +796,13 @@ public final class NewHud {
             new Direction(0.46f, 0.012f),
             new NewHudExtras.Coordinates(0.012f, 0.78f),
             new NewHudExtras.PotionEffects(0.80f, 0.30f),
-            new NewHudExtras.Keystrokes(0.86f, 0.62f)
+            new NewHudExtras.Keystrokes(0.86f, 0.62f),
+            new PingEl(0.86f, 0.02f),
+            new ServerAddressEl(0.66f, 0.02f),
+            new PlaytimeEl(0.86f, 0.085f),
+            new ComboEl(0.44f, 0.62f),
+            new ReachEl(0.44f, 0.69f),
+            new PackEl(0.66f, 0.085f)
     };
 
     // ------------------------------------------------------------------ registration
@@ -638,7 +827,15 @@ public final class NewHud {
                 client.setScreen(new NewLauncherScreen());
             }
             syncVanillaIndicator(client);
+            tickStats(client);
         }));
+
+        net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+            if (world.isClient()) {
+                onAttack(player, entity);
+            }
+            return net.minecraft.util.ActionResult.PASS;
+        });
 
         // If HudElementRegistry/VanillaHudElements don't resolve on this Fabric API build, the
         // older equivalent is: HudRenderCallback.EVENT.register((context, tickCounter) -> render(context));

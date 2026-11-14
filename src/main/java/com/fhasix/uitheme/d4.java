@@ -1,5 +1,7 @@
 package com.fhasix.uitheme;
 
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
@@ -50,6 +52,12 @@ public class d4 extends ButtonWidget {
             int overlayAlpha = Math.round(hoverProgress * HOVER_MAX_ALPHA);
             a1.drawRoundedGradientRect(context, x, y, w, h, HOVER_RED, HOVER_RED, overlayAlpha);
         }
+
+        // The label is drawn here (ButtonWidget.drawIcon draws it normally, but we override it without super).
+        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+        String label = this.getMessage().getString();
+        NewFont.drawTitle(context, tr, label, x + (w - NewFont.widthTitle(tr, label, true, true)) / 2,
+                y + (h - tr.fontHeight) / 2 + NewFont.Y_TITLE, TEXT_COLOR, true, true);
     }
 
 }

@@ -5,11 +5,15 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 
 /**
- * Hitbox: draws the hitbox of nearby entities as a wireframe box. Only two settings: colour (colour
+ * Hitbox: draws the hitbox of nearby PLAYERS (not items or mobs) as a wireframe box, and only the ones you can
+ * actually see - a player behind a wall is not drawn. Only two settings: colour (colour
  * picker) and size (percent of the real hitbox). Drawn as a HUD overlay from projected box corners,
  * so it needs no world-rendering hooks. First-person view only.
  */
@@ -18,7 +22,7 @@ final class NewHitbox {
     static final String ID = "hitbox";
 
     private static final double RANGE = 48.0;
-    private static final int MAX_DRAWN = 30;
+    private static final int MAX_DRAWN = 12;
     private static final NewProjection PROJ = new NewProjection();
 
     private NewHitbox() {
@@ -38,11 +42,10 @@ final class NewHitbox {
                 || !PROJ.begin(c, g, tickProgress)) {
             return;
         }
-        int cap = NewPerf.overlayCap(MAX_DRAWN);
-        if (cap == 0) {
-            return;
-        }
-        double range = NewPerf.overlayRange(RANGE);
+        // Hitbox is a feature the player switched on, so the Performance > HUD Optimizer (which Low End turns on)
+        // no longer hides it: players only, so a fixed small cap and range keep it cheap anyway.
+        int cap = MAX_DRAWN;
+        double range = RANGE;
         int color = 0xFF000000 | (NewModSettings.opt(c, ID, "rgb") & 0xFFFFFF);
         double scale = NewModSettings.opt(c, ID, "size") / 100.0;
         Entity camEntity = c.getCameraEntity() != null ? c.getCameraEntity() : c.player;
@@ -52,11 +55,14 @@ final class NewHitbox {
             if (drawn >= cap) {
                 break;
             }
-            if (e == camEntity || e == c.player || e.isRemoved()) {
+            if (!(e instanceof PlayerEntity) || e == camEntity || e == c.player || e.isRemoved()) {
                 continue;
             }
             Vec3d p = e.getLerpedPos(tickProgress);
             if (PROJ.distanceSq(p.x, p.y, p.z) > range * range) {
+                continue;
+            }
+            if (!canSee(c, camEntity, e, p)) {
                 continue;
             }
             double hw = e.getWidth() / 2.0 * scale;
@@ -82,6 +88,22 @@ final class NewHitbox {
             }
             drawn++;
         }
+    }
+
+    /** True when at least one of three points on the player (feet, middle, head) is not hidden behind blocks. */
+    private static boolean canSee(MinecraftClient c, Entity cam, Entity e, Vec3d p) {
+        Vec3d from = PROJ.eyePos();
+        double height = e.getHeight();
+        double[] ys = {0.2, height / 2.0, Math.max(0.2, height - 0.1)};
+        for (double dy : ys) {
+            Vec3d to = new Vec3d(p.x, p.y + dy, p.z);
+            HitResult hit = c.world.raycast(new RaycastContext(from, to, RaycastContext.ShapeType.COLLIDER,
+                    RaycastContext.FluidHandling.NONE, cam));
+            if (hit.getType() == HitResult.Type.MISS) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 1px line drawn as horizontal / vertical runs, so a whole edge costs only a handful of fills. */

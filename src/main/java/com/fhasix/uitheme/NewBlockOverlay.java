@@ -41,7 +41,7 @@ final class NewBlockOverlay {
         int borderAlpha = Math.max(0, Math.min(100, NewModSettings.opt(c, ID, "balpha"))) * 255 / 100;
         MatrixStack ms = context.matrices();
         VertexConsumerProvider consumers = context.consumers();
-        Vec3d cam = c.gameRenderer.getCamera().getPos();
+        Vec3d cam = c.gameRenderer.getCamera().getCameraPos();
         double ox = pos.getX() - cam.x;
         double oy = pos.getY() - cam.y;
         double oz = pos.getZ() - cam.z;

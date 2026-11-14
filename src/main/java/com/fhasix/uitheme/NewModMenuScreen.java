@@ -1,84 +1,102 @@
 package com.fhasix.uitheme;
 
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * NEW (v30 UI rewrite, replaces the first version). The Mod Menu grid.
+ * NEW (v31 Feather-style redesign). The Mod Menu grid.
  *
- * Layout: every rectangle is taken from the reference screenshot (a 1394x847 design) and scaled
- * by ONE factor k = min(width/1394, height/847), then centred. So the menu keeps the reference's
- * exact proportions on any window size / GUI scale instead of stretching to the screen.
+ * Layout: every rectangle is measured from the reference (1920x1080) and scaled by ONE factor k, so the
+ * menu keeps the reference's proportions on any window size / GUI scale. Design space: x = 0 is the left
+ * edge of the menu area, y = 0 is the top of the header (logo / title / date / account / buttons).
  *
- * Speed: no a1 gradients (one fill per pixel column) and no vanilla items. Everything is drawn with
- * NewUi.rrect (about 2r+1 fills per shape) plus smooth antialiased icons from one atlas texture.
- * Scrolling is eased. Hover uses the title-screen button colours (instant swap, bluish-grey).
+ * Look: dark panel, tile tabs with a faint corner-lit edge, cards with the same edge as the title-screen
+ * buttons, diagonal slate hover, green Enabled pill with a click ripple, smooth (anti-aliased) corners and
+ * smooth icons. Fonts: Product Sans (regular / medium / bold files in assets/fhasixuitheme/font).
  *
  * Opens from the title-screen grid icon (parent = TitleScreen) and from the in-world launcher
- * (parent = null). Working: FPS/CPS pills, hearts, tabs, search, favourites filter, scrolling.
- * Decorative: top icon row, gear buttons, grid-view button, placeholder mods' pills.
+ * (parent = null). Working: FPS/CPS pills, hearts, tabs, search, favourites filter, scrolling. (Performance / General / Mod Profiles are NewSettingsScreen pages.)
+ * Decorative: header buttons, most tab icons, grid-view button, placeholder mods' pills.
  */
 public final class NewModMenuScreen extends Screen {
 
     private static final int DW = 1394;
-    private static final int DH = 847;
+    private static final int DH = 958;
+    /** The whole header + menu is fitted into this many design pixels (width x height). */
+    private static final float FIT_W = 1700f;
+    private static final float FIT_H = 985f;
     private static final int COLS = 4;
-    private static final String[] TABS = {"All", "New", "HUD", "Hypixel", "PvP"};
-    private static final String[] PERF_TABS = {"All", "World", "Video", "System"};
-    private static final String[] TOP = {"gear", "chat", "gem", "archive", "list"};
-    private static final Identifier[] TOP_TEX = new Identifier[TOP.length];
+    private static final String[] TABS = {"All", "HUD", "Hypixel", "PvP"};
+    private static final String[] FX = {"fx_gear", "fx_comment", "fx_monitor", "fx_cape", "fx_desktop", "fx_chats", "fx_profile"};
+    private static final String[] FX_TIP = {"Performance", "Chat", "Display", "Cosmetics", "General", "Social", "Mod Profiles"};
+    private static final Identifier[] FX_TEX = new Identifier[FX.length];
+    private static final int FX_SIZE = 96;
+    private static final Identifier FX_MOON = fx("fx_moon");
+    private static final Identifier FX_GEARS = fx("fx_gears");
+    private static final Identifier FX_CHATS = fx("fx_chats");
+    private static final Identifier FX_MOVE = fx("fx_move");
+    private static final Identifier FX_CLOSE = fx("fx_close");
+    private static final Identifier MARK = Identifier.of("fhasixuitheme", "textures/gui/title/new_fhasix_mark.png");
+    private static final int MARK_TEX = 256;
+    private static final Identifier TITLE_BG = Identifier.of("fhasixuitheme", "textures/gui/title/background.png");
+    private static final int TITLE_BG_W = 1584;
+    private static final int TITLE_BG_H = 672;
+    private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("yyyy/MM/dd  hh:mm a", Locale.ENGLISH);
+
+    private static Identifier fx(String name) {
+        return Identifier.of("fhasixuitheme", "textures/gui/fx/" + name + ".png");
+    }
 
     static {
-        for (int i = 0; i < TOP.length; i++) {
-            TOP_TEX[i] = Identifier.of("fhasixuitheme", "textures/gui/icons/" + TOP[i] + ".png");
+        for (int i = 0; i < FX.length; i++) {
+            FX_TEX[i] = fx(FX[i]);
         }
     }
 
-    // colours (ARGB)
-    private static final int PANEL_T = NewUi.rgb(11, 12, 15);
-    private static final int PANEL_B = NewUi.rgb(8, 9, 12);
-    private static final int BTN_BORDER = NewUi.rgb(30, 33, 40);
-    private static final int BTN_T = NewUi.rgb(20, 22, 28);
-    private static final int BTN_B = NewUi.rgb(15, 17, 21);
-    private static final int HOV_T = NewUi.rgb(54, 64, 78);
-    private static final int HOV_B = NewUi.rgb(23, 26, 33);
-    private static final int CARD_BORDER = NewUi.rgb(26, 29, 35);
-    private static final int CARD_T = NewUi.rgb(16, 18, 22);
-    private static final int CARD_B = NewUi.rgb(13, 14, 18);
-    private static final int RED_T = NewUi.rgb(231, 60, 64);
-    private static final int RED_B = NewUi.rgb(205, 46, 50);
-    private static final int RED_HT = NewUi.rgb(240, 84, 88);
-    private static final int RED_HB = NewUi.rgb(214, 58, 62);
-    private static final int ON_T = NewUi.rgb(27, 78, 33);
-    private static final int ON_B = NewUi.rgb(20, 60, 25);
-    private static final int ON_HT = NewUi.rgb(36, 98, 43);
-    private static final int ON_HB = NewUi.rgb(25, 72, 30);
-    private static final int NEW_T = NewUi.rgb(46, 176, 66);
-    private static final int NEW_B = NewUi.rgb(33, 146, 53);
+    // colours (ARGB) - sampled from the reference
+    private static final int PANEL_T = NewUi.rgb(15, 17, 20);
+    private static final int PANEL_B = NewUi.rgb(14, 16, 19);
+    private static final int PANEL_BG = NewUi.rgb(15, 17, 20);
+    private static final int PANEL_EDGE = NewUi.rgb(23, 26, 31);
+    private static final int TILE_EDGE = NewUi.rgb(29, 32, 38);
+    private static final int TILE_T = NewUi.rgb(15, 17, 20);
+    private static final int TILE_B = NewUi.rgb(13, 15, 18);
+    private static final int BTN = NewUi.rgb(25, 27, 30);
+    private static final int BTN_HOV = NewUi.rgb(42, 46, 53);
+    private static final int CHIP = NewUi.rgb(26, 29, 32);
+    private static final int CARD_BORDER = NewUi.rgb(24, 27, 32);
+    private static final int CARD_T = NewUi.rgb(15, 17, 20);
+    private static final int CARD_B = NewUi.rgb(14, 16, 19);
+    private static final int HOV_TL = NewUi.rgb(60, 70, 82);
+    private static final int HOV_BR = NewUi.rgb(28, 32, 38);
+    private static final int HOV_MID = NewUi.rgb(44, 51, 60);
+    private static final int ON = NewUi.rgb(25, 69, 27);
+    private static final int ON_H = NewUi.rgb(32, 86, 35);
+    private static final int OFF_H = NewUi.rgb(41, 45, 51);
     private static final int TXT = 0xFFFFFFFF;
-    private static final int TXT_DIM = 0xFF8C8F96;
-    private static final int TXT_TAB = 0xFFB4B7BE;
-    private static final int TXT_ON = 0xFF3FBF4D;
+    private static final int TXT_DIM = 0xFF7A7B7F;
+    private static final int TXT_TAB = 0xFF9A9DA3;
+    private static final int TXT_ON = 0xFF2E9A2C;
 
     private static final int HIT_NONE = 0;
     private static final int HIT_HEART = 1;
     private static final int HIT_PILL = 2;
     private static final int HIT_GEAR = 3;
     private static final int HIT_CARD = 4;
-    private static final int HIT_CHIP = 5;
 
     private static final class Hit {
         final int kind;
@@ -103,35 +121,91 @@ public final class NewModMenuScreen extends Screen {
         int px, py, pw, ph;
         int ix, iy, is;
         int nx, ny;
-        /** Performance view: the Small / Medium / High value chips (first chip x, y, width, height, gap). */
-        int cx, cy, cw, ch, cgap;
     }
 
     private final Screen parent;
-    /** True = the Performance view: same menu, but the cards are the FPS modes of NewPerf instead of mods. */
-    private final boolean perf;
     private TextFieldWidget searchField;
     private int tab = 0;
     private boolean favOnly = false;
-    private boolean filterApplied = false;
 
-    /** Eased 0..1 state of each card's Enabled pill (on/off) and its hover glow. */
-    private final Map<String, Float> pillOn = new HashMap<>();
-    private final Map<String, Float> pillHover = new HashMap<>();
+    /** Every eased 0..1 animation value of the menu (hover glows, Enabled pills, tooltips), by key. */
+    private final Map<String, Float> anim = new HashMap<>();
+    /** Running click ripples: mod id -> {start nanos, x, y}. */
+    private final Map<String, long[]> ripples = new HashMap<>();
     private long animLast = System.nanoTime();
     private float animDt = 0f;
+    private String clockText = "";
+    private long clockAt = 0L;
 
     private float k;
     private int ox;
     private int oy;
     private int[] modTab;
-    private final int[][] topBtn = new int[TOP.length][];
+    private final int[][] topBtn = new int[FX.length][];
     private int[] closeBtn;
     private int[] panel;
+    private int[] logoR;
+    private int[] datePill;
+    private int[] accountPill;
+    private final int[][] hdrBtn = new int[3][];
     private final int[][] tabRect = new int[TABS.length][];
     private int[] searchRect;
     private int[] favBtn;
     private int[] gridBtn;
+
+    // click ripple + a short delay when this menu swaps to another view (a settings page, a mod's settings)
+    private long navStart;
+    private int[] navRect;
+    private int navRad;
+    private float navX;
+    private float navY;
+    private Runnable navAction;
+    private static final float NAV_RIPPLE_S = 0.32f;
+    private static final float NAV_DELAY_S = 0.20f;
+
+    private void navRipple(int[] rect, int rad, double x, double y, Runnable action) {
+        if (navAction != null) {
+            return;
+        }
+        navRect = rect.clone();
+        navRad = rad;
+        navX = (float) x;
+        navY = (float) y;
+        navStart = System.nanoTime();
+        navAction = action;
+    }
+
+    private void drawNavRipple(DrawContext c) {
+        if (navAction == null) {
+            return;
+        }
+        float t = (System.nanoTime() - navStart) / 1_000_000_000f;
+        float p = Math.min(1f, t / NAV_RIPPLE_S);
+        float ease = 1f - (1f - p) * (1f - p) * (1f - p);
+        float lx = navX - navRect[0];
+        float ly = navY - navRect[1];
+        float far = (float) Math.sqrt(Math.max(lx, navRect[2] - lx) * Math.max(lx, navRect[2] - lx)
+                + Math.max(ly, navRect[3] - ly) * Math.max(ly, navRect[3] - ly));
+        NewUi.ripple(c, navRect[0], navRect[1], navRect[2], navRect[3], navRad, navX, navY, far * ease,
+                NewUi.withAlpha(0xFFFFFFFF, 0.20f - 0.08f * p));
+        if (t >= NAV_DELAY_S) {
+            Runnable a = navAction;
+            navAction = null;
+            a.run();
+        }
+    }
+
+    /** Rectangle of a mod card's gear button (for the click ripple). */
+    private int[] gearRect(NewModSettings.ModDef mod) {
+        List<NewModSettings.ModDef> list = visible();
+        layout(list.size());
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i) == mod && geos[i] != null) {
+                return new int[]{geos[i].gx, geos[i].gy, geos[i].gs, geos[i].gs};
+            }
+        }
+        return null;
+    }
     private int clipTop;
     private int clipBottom;
     private int clipL;
@@ -154,18 +228,21 @@ public final class NewModMenuScreen extends Screen {
 
     /** parent == null means "opened in a world": nothing to draw behind, closing returns to the game. */
     public NewModMenuScreen(Screen parent) {
-        this(parent, false);
+        super(Text.literal("MOD MENU"));
+        this.parent = parent;
     }
 
-    /** perf = true opens the Performance view (the gear in the top bar). */
-    public NewModMenuScreen(Screen parent, boolean perf) {
-        super(Text.literal(perf ? "PERFORMANCE" : "MOD MENU"));
-        this.parent = parent;
-        this.perf = perf;
+    /** Font size for a design-size value: the whole menu is scaled by k, so the text is too. */
+    private float fs(float design) {
+        return design * k;
+    }
+
+    private int cyUi(int centreY, float size) {
+        return NewFont.centerYUi(centreY - 4, 8, size);
     }
 
     private String[] tabs() {
-        return perf ? PERF_TABS : TABS;
+        return TABS;
     }
 
     // ---------------------------------------------------------------- layout
@@ -190,25 +267,36 @@ public final class NewModMenuScreen extends Screen {
 
     @Override
     protected void init() {
-        k = NewUi.scale(width, height);
+        k = Math.min(width / FIT_W, height / FIT_H);
         ox = (width - Math.round(DW * k)) / 2;
         oy = (height - Math.round(DH * k)) / 2;
 
-        modTab = rect(47, 30, 177, 63);
-        for (int i = 0; i < TOP.length; i++) {
-            topBtn[i] = rect(237 + 88 * i, 30, 76, 63);
+        // header
+        logoR = rect(-118, 8, 62, 62);
+        datePill = rect(120, 25, 257, 40);
+        accountPill = rect(1134, 8, 170, 63);
+        for (int i = 0; i < hdrBtn.length; i++) {
+            hdrBtn[i] = rect(1315 + 77 * i, 8, 64, 63);
         }
-        closeBtn = rect(1305, 38, 46, 47);
-        panel = rect(47, 110, 1305, 725);
-        for (int i = 0; i < TABS.length; i++) {
-            tabRect[i] = rect(70 + 120 * i, 133, 108, 39);
-        }
-        searchRect = rect(913, 133, 310, 39);
-        favBtn = rect(1235, 133, 40, 39);
-        gridBtn = rect(1288, 133, 40, 39);
 
-        clipTop = sy(180);
-        clipBottom = sy(829);
+        // tab row
+        modTab = rect(47, 117, 178, 64);
+        for (int i = 0; i < FX.length; i++) {
+            topBtn[i] = rect(237 + 88 * i, 117, 76, 64);
+        }
+        closeBtn = rect(1305, 125, 46, 47);
+
+        // panel + toolbar
+        panel = rect(47, 197, 1305, 725);
+        for (int i = 0; i < TABS.length; i++) {
+            tabRect[i] = rect(70 + 120 * i, 220, 108, 39);
+        }
+        searchRect = rect(913, 220, 310, 39);
+        favBtn = rect(1235, 220, 40, 39);
+        gridBtn = rect(1288, 220, 40, 39);
+
+        clipTop = sy(267);
+        clipBottom = sy(916);
         clipL = sx(47) + 1;
         clipR = sx(1352) - 1;
         cardW = sx(72 + 304) - sx(72);
@@ -216,23 +304,19 @@ public final class NewModMenuScreen extends Screen {
         pitchX = Math.round(317 * k);
         pitchY = Math.round(222 * k);
         firstX = sx(72);
-        firstY = sy(188);
+        firstY = sy(275);
 
-        int padX = sl(14);
+        int padX = sl(16);
         searchField = new TextFieldWidget(textRenderer, searchRect[0] + padX,
                 searchRect[1] + (searchRect[3] - textRenderer.fontHeight) / 2,
                 Math.max(10, searchRect[2] - padX * 2), textRenderer.fontHeight + 2, Text.literal("Search"));
         searchField.setMaxLength(32);
         searchField.setDrawsBackground(false);
-        try {
-            searchField.setPlaceholder(Text.literal("Search"));
-        } catch (Throwable ignored) {
-            // placeholder API missing - the field still works
-        }
+        // The field only handles typing/focus; its text and caret are drawn by this screen (smooth Product Sans).
         this.addDrawableChild(searchField);
     }
 
-    /** Intentionally empty: the blur is applied from render() so it happens exactly once, in order. */
+    /** Intentionally empty: the background is drawn from render() so it happens exactly once, in order. */
 
     /**
      * Vanilla background (panorama / blur / darkening) drawn once. The game allows only ONE blur per
@@ -254,6 +338,12 @@ public final class NewModMenuScreen extends Screen {
     /** The screen behind this menu (null in a world). Used by the options screen. */
     Screen backdrop() {
         return parent;
+    }
+
+    /** The title-screen background (same one the title screen draws): the moving panorama over a w x h screen. */
+    static void drawTitleBackdrop(DrawContext c, int w, int h) {
+        FhasixPanorama.draw(c, w, h); // UPDATE 42: the moving panorama (the pictures are already dark - only a light dim)
+        c.fill(0, 0, w, h, 0x1F000000);
     }
 
     private void closeMenu() {
@@ -287,21 +377,6 @@ public final class NewModMenuScreen extends Screen {
             g.iy = g.y + sl(97) - g.is / 2;
             g.nx = g.x + sl(24);
             g.ny = g.y + sl(34) - textRenderer.fontHeight / 2;
-            if (perf) {
-                // FPS-mode card: icon, the Small / Medium / High chips, then the Enabled pill across the bottom
-                g.is = Math.max(14, sl(50));
-                g.ix = g.x + (g.w - g.is) / 2;
-                g.iy = g.y + sl(52);
-                g.px = g.x + sl(24);
-                g.pw = g.w - sl(48);
-                g.ph = Math.max(12, sl(34));
-                g.py = g.y + g.h - sl(20) - g.ph;
-                g.cgap = Math.max(2, sl(6));
-                g.cw = (g.w - sl(48) - 2 * g.cgap) / 3;
-                g.ch = Math.max(11, sl(30));
-                g.cy = g.py - sl(10) - g.ch;
-                g.cx = g.x + sl(24);
-            }
         }
     }
 
@@ -316,33 +391,14 @@ public final class NewModMenuScreen extends Screen {
     private List<NewModSettings.ModDef> visible() {
         String q = searchField == null ? "" : searchField.getText().trim().toLowerCase(Locale.ROOT);
         List<NewModSettings.ModDef> out = new ArrayList<>();
-        if (perf) {
-            for (NewModSettings.ModDef m : NewPerf.DEFS) {
-                int want = tab == 1 ? NewModSettings.TAG_HUD : tab == 2 ? NewModSettings.TAG_HYPIXEL : tab == 3 ? NewModSettings.TAG_PVP : 0;
-                if (want != 0 && (m.tags & want) == 0) {
-                    continue;
-                }
-                if (favOnly && !NewModSettings.isFavorite(client, m.id)) {
-                    continue;
-                }
-                if (!q.isEmpty() && !m.name.toLowerCase(Locale.ROOT).contains(q)) {
-                    continue;
-                }
-                out.add(m);
-            }
-            return out;
-        }
         for (NewModSettings.ModDef m : NewModSettings.MODS) {
-            if (tab == 1 && !m.isNew) {
+            if (tab == 1 && (m.tags & NewModSettings.TAG_HUD) == 0) {
                 continue;
             }
-            if (tab == 2 && (m.tags & NewModSettings.TAG_HUD) == 0) {
+            if (tab == 2 && (m.tags & NewModSettings.TAG_HYPIXEL) == 0) {
                 continue;
             }
-            if (tab == 3 && (m.tags & NewModSettings.TAG_HYPIXEL) == 0) {
-                continue;
-            }
-            if (tab == 4 && (m.tags & NewModSettings.TAG_PVP) == 0) {
+            if (tab == 3 && (m.tags & NewModSettings.TAG_PVP) == 0) {
                 continue;
             }
             if (favOnly && !NewModSettings.isFavorite(client, m.id)) {
@@ -375,13 +431,7 @@ public final class NewModMenuScreen extends Screen {
             if (NewUi.in(mx, my, g.hx, g.hy, g.hs, g.hs)) {
                 return new Hit(HIT_HEART, m);
             }
-            if (perf) {
-                for (int j = 0; j < 3; j++) {
-                    if (NewUi.in(mx, my, g.cx + j * (g.cw + g.cgap), g.cy, g.cw, g.ch)) {
-                        return new Hit(HIT_CHIP, m, j);
-                    }
-                }
-            } else if (NewUi.in(mx, my, g.gx, g.gy, g.gs, g.gs)) {
+            if (NewUi.in(mx, my, g.gx, g.gy, g.gs, g.gs)) {
                 return new Hit(HIT_GEAR, m);
             }
             if (NewUi.in(mx, my, g.px, g.py, g.pw, g.ph)) {
@@ -392,6 +442,38 @@ public final class NewModMenuScreen extends Screen {
         return new Hit(HIT_NONE, null);
     }
 
+    // ---------------------------------------------------------------- animation helpers
+
+    /** Moves a stored 0..1 value towards target (frame-rate independent); a first-seen value snaps (no animation on open). */
+    private float ease(String key, float target, float speed) {
+        if (NewPerf.animationsOff()) { // HUD Optimizer: no UI animations
+            anim.put(key, target);
+            return target;
+        }
+        float cur = anim.getOrDefault(key, target);
+        cur += (target - cur) * Math.min(1f, animDt * speed);
+        if (Math.abs(target - cur) < 0.004f) {
+            cur = target;
+        }
+        anim.put(key, cur);
+        return cur;
+    }
+
+    private static float smooth(float t) {
+        return t * t * (3f - 2f * t);
+    }
+
+    private static int mix(int a, int b, float t) {
+        return NewUi.lerp(a, b, t);
+    }
+
+    /** Greys a white icon by laying the colour that is behind it over it (no box shows, the icon just turns grey). */
+    private static void dim(DrawContext c, int x, int y, int size, int bg, float a) {
+        if (a > 0.02f) {
+            c.fill(x, y, x + size, y + size, NewUi.withAlpha(bg | 0xFF000000, a));
+        }
+    }
+
     // ---------------------------------------------------------------- render
 
     @Override
@@ -400,14 +482,10 @@ public final class NewModMenuScreen extends Screen {
         animDt = Math.min(0.1f, (animNow - animLast) / 1_000_000_000f);
         animLast = animNow;
         if (parent != null) {
-            parent.render(c, -1000, -1000, delta); // far-away mouse: title buttons underneath stay calm
+            drawTitleBackdrop(c, width, height); // our own backdrop: the title buttons underneath must not show through
         } else {
             safeBackground(c, mx, my, delta); // in a world: vanilla blur + darkening (needs Menu Background Blur > 0)
-        }
-        c.fill(0, 0, width, height, parent != null ? 0x42000000 : 0x30000000);
-
-        if (!filterApplied) {
-            filterApplied = true;
+            c.fill(0, 0, width, height, 0x40000000);
         }
 
         List<NewModSettings.ModDef> list = visible();
@@ -425,8 +503,9 @@ public final class NewModMenuScreen extends Screen {
             }
         }
 
-        drawTopBar(c, mx, my);
+        drawTabRow(c, mx, my); // (the top header bar - date, account, chat / settings / move buttons - is removed)
         NewUi.rrect(c, panel[0], panel[1], panel[2], panel[3], Math.max(3, sl(12)), PANEL_T, PANEL_B);
+        NewUi.ring(c, panel[0], panel[1], panel[2], panel[3], Math.max(3, sl(12)), PANEL_EDGE);
         drawToolbar(c, mx, my);
 
         layout(list.size());
@@ -440,226 +519,327 @@ public final class NewModMenuScreen extends Screen {
             drawCard(c, list.get(i), g, mx, my, over);
         }
         c.disableScissor();
-        if (perf) {
-            drawPerfHint(c, list, mx, my);
-        }
 
         if (max > 0f) {
-            int bw = Math.max(2, sl(5));
-            int bx = sx(1345);
+            int bw = Math.max(2, sl(6));
+            int bx = sx(1342);
             int th = Math.max(12, Math.round((clipBottom - clipTop) * ((clipBottom - clipTop) / (clipBottom - clipTop + max))));
             int ty = clipTop + sl(6) + Math.round((clipBottom - clipTop - sl(12) - th) * (scrollCur / max));
-            NewUi.rrect(c, bx, ty, bw, th, bw / 2, NewUi.rgb(96, 99, 106), NewUi.rgb(80, 83, 90));
+            NewUi.rrect(c, bx, ty, bw, th, bw / 2, NewUi.rgb(88, 89, 92), NewUi.rgb(80, 81, 84));
         }
 
-        super.render(c, mx, my, delta); // the search field
+        String ver = "Fhasix Client";
+        float vsz = fs(14f);
+        NewFont.drawUi(c, textRenderer, ver, panel[0] + (panel[2] - NewFont.widthUi(textRenderer, ver, NewFont.W_MED, vsz)) / 2,
+                panel[1] + panel[3] + sl(14), NewUi.rgb(96, 98, 104), NewFont.W_MED, vsz);
+
+        drawNavRipple(c);
+        drawTips(c);
+        // the search field's own drawing is skipped on purpose: drawSearch() paints its text and caret
     }
 
-    private void drawTopBar(DrawContext c, int mx, int my) {
+    // ---------------------------------------------------------------- header
+
+    /** A dark tile with the faint corner-lit edge (tabs and header buttons). hv = hover 0..1. */
+    private void tile(DrawContext c, int[] r, float hv, int rad) {
+        NewUi.rrect(c, r[0], r[1], r[2], r[3], rad, mix(TILE_T, HOV_TL, hv), mix(TILE_B, HOV_BR, hv));
+        NewButtonArt.edge(c, r[0], r[1], r[2], r[3], rad, 0.20f + 0.08f * hv); // same edge as Singleplayer / Multiplayer
+    }
+
+    private static final String[] FACE = {
+            "HHHHHHHH", "HHHHHHHH", "HSSSSSSH", "SSSSSSSS", "SWBSSBWS", "SSSNNSSS", "SSNMMNSS", "SSSSSSSS"};
+
+    private static int faceColor(char ch) {
+        switch (ch) {
+            case 'H': return NewUi.rgb(58, 38, 26);
+            case 'S': return NewUi.rgb(178, 128, 100);
+            case 'W': return NewUi.rgb(255, 255, 255);
+            case 'B': return NewUi.rgb(70, 58, 140);
+            case 'N': return NewUi.rgb(150, 100, 76);
+            default: return NewUi.rgb(105, 62, 50);
+        }
+    }
+
+    /** A small pixel-art head for the account pill. */
+    private void drawFace(DrawContext c, int x, int y, int size) {
+        int p = Math.max(1, size / 8);
+        int x0 = x + (size - p * 8) / 2;
+        int y0 = y + (size - p * 8) / 2;
+        for (int row = 0; row < 8; row++) {
+            int col = 0;
+            while (col < 8) {
+                char ch = FACE[row].charAt(col);
+                int end = col + 1;
+                while (end < 8 && FACE[row].charAt(end) == ch) {
+                    end++;
+                }
+                c.fill(x0 + col * p, y0 + row * p, x0 + end * p, y0 + (row + 1) * p, faceColor(ch));
+                col = end;
+            }
+        }
+    }
+
+    private void drawHeader(DrawContext c, int mx, int my) {
+        int rad = Math.max(3, sl(10));
+        // logo + title
+        c.drawTexture(RenderPipelines.GUI_TEXTURED, MARK, logoR[0], logoR[1], 0, 0, logoR[2], logoR[3],
+                MARK_TEX, MARK_TEX, MARK_TEX, MARK_TEX);
+        String title = "MOD MENU";
+        float tsz = fs(27f);
+        int tx = sx(-46);
+        NewFont.drawUi(c, textRenderer, title, tx, NewFont.centerYUi(sy(8), sl(63), tsz), TXT, NewFont.W_BOLD, tsz);
+        int tw = NewFont.widthUi(textRenderer, title, NewFont.W_BOLD, tsz);
+
+        // date / time pill
+        long ms = System.currentTimeMillis();
+        if (ms - clockAt > 500L || clockText.isEmpty()) {
+            clockAt = ms;
+            clockText = LocalDateTime.now().format(CLOCK);
+        }
+        float dsz = fs(17f);
+        int ms2 = Math.max(8, Math.round(datePill[3] * 0.50f));
+        int dtw = NewFont.widthUi(textRenderer, clockText, NewFont.W_BOLD, dsz);
+        int dw = sl(22) + ms2 + sl(16) + dtw + sl(24);
+        int dx = Math.max(datePill[0], tx + tw + sl(34));
+        int[] dp = {dx, datePill[1], dw, datePill[3]};
+        tile(c, dp, 0f, Math.max(3, sl(9)));
+        NewUi.tex(c, FX_MOON, dp[0] + sl(22), dp[1] + (dp[3] - ms2) / 2, ms2, FX_SIZE);
+        NewFont.drawUi(c, textRenderer, clockText, dp[0] + sl(22) + ms2 + sl(16), NewFont.centerYUi(dp[1], dp[3], dsz),
+                TXT, NewFont.W_BOLD, dsz);
+
+        // account pill: head + name
+        float ah = ease("hdr:acc", NewUi.in(mx, my, accountPill[0], accountPill[1], accountPill[2], accountPill[3]) ? 1f : 0f, 14f);
+        tile(c, accountPill, ah, rad);
+        int hs = Math.max(8, Math.round(accountPill[3] * 0.52f));
+        drawFace(c, accountPill[0] + sl(18), accountPill[1] + (accountPill[3] - hs) / 2, hs);
+        String name = client.getSession().getUsername();
+        name = name == null ? "" : name.toUpperCase(Locale.ROOT);
+        float nsz = fs(17f);
+        int nx = accountPill[0] + sl(18) + hs + sl(14);
+        name = NewFont.fitUi(textRenderer, name, NewFont.W_BOLD, nsz, accountPill[0] + accountPill[2] - nx - sl(14));
+        NewFont.drawUi(c, textRenderer, name, nx, NewFont.centerYUi(accountPill[1], accountPill[3], nsz), TXT, NewFont.W_BOLD, nsz);
+
+        // chat / settings / move buttons
+        Identifier[] ic = {FX_CHATS, FX_GEARS, FX_MOVE};
+        for (int i = 0; i < hdrBtn.length; i++) {
+            int[] r = hdrBtn[i];
+            float hv = ease("hdr:" + i, NewUi.in(mx, my, r[0], r[1], r[2], r[3]) ? 1f : 0f, 14f);
+            tile(c, r, hv, rad);
+            int s = Math.max(8, Math.round(r[3] * 0.46f));
+            NewUi.tex(c, ic[i], r[0] + (r[2] - s) / 2, r[1] + (r[3] - s) / 2, s, FX_SIZE);
+        }
+    }
+
+    private void drawTabRow(DrawContext c, int mx, int my) {
+        int rad = Math.max(3, sl(10));
         boolean hov = NewUi.in(mx, my, modTab[0], modTab[1], modTab[2], modTab[3]);
-        NewUi.rrect(c, modTab[0], modTab[1], modTab[2], modTab[3], Math.max(3, sl(10)),
-                hov ? RED_HT : RED_T, hov ? RED_HB : RED_B);
-        Text label = Text.literal(perf ? "PERFORMANCE" : "MOD MENU").formatted(Formatting.BOLD);
+        float mh = ease("tab:mod", hov ? 1f : 0f, 14f);
+        int red = mix(FhasixTheme.red(), FhasixTheme.redHover(), mh);
+        NewUi.rrect(c, modTab[0], modTab[1], modTab[2], modTab[3], rad, red, red);
+        String label = "MOD MENU";
+        float lsz = fs(18f);
         int ico = Math.max(9, sl(24));
-        int tw = textRenderer.getWidth(label);
+        int tw = NewFont.widthUi(textRenderer, label, NewFont.W_BOLD, lsz);
         boolean showIcon = modTab[2] >= ico + 4 + tw + 6;
-        int total = (showIcon ? ico + 4 : 0) + tw;
+        int total = (showIcon ? ico + 8 : 0) + tw;
         int sx0 = modTab[0] + (modTab[2] - total) / 2;
         if (showIcon) {
             NewUi.icon(c, NewUi.ICON_GRID, sx0, modTab[1] + (modTab[3] - ico) / 2, ico);
-            sx0 += ico + 4;
+            sx0 += ico + 8;
         }
-        c.drawText(textRenderer, label, sx0, modTab[1] + (modTab[3] - textRenderer.fontHeight) / 2, TXT, false);
+        NewFont.drawUi(c, textRenderer, label, sx0, NewFont.centerYUi(modTab[1], modTab[3], lsz), TXT, NewFont.W_BOLD, lsz);
 
-        for (int i = 0; i < TOP.length; i++) {
+        for (int i = 0; i < FX.length; i++) {
             int[] r = topBtn[i];
             boolean h = NewUi.in(mx, my, r[0], r[1], r[2], r[3]);
-            if (perf && i == 0) {
-                NewUi.frame(c, r[0], r[1], r[2], r[3], Math.max(3, sl(10)), RED_B, h ? RED_HT : RED_T, h ? RED_HB : RED_B);
-            } else {
-                NewUi.frame(c, r[0], r[1], r[2], r[3], Math.max(3, sl(10)), BTN_BORDER,
-                        h ? HOV_T : BTN_T, h ? HOV_B : BTN_B);
-            }
+            float hv = ease("top:" + i, h ? 1f : 0f, 14f);
+            tile(c, r, hv, rad);
             int s = Math.max(8, Math.round(r[3] * 0.46f));
-            NewUi.whole(c, TOP_TEX[i], r[0] + (r[2] - s) / 2, r[1] + (r[3] - s) / 2, s);
+            NewUi.tex(c, FX_TEX[i], r[0] + (r[2] - s) / 2, r[1] + (r[3] - s) / 2, s, FX_SIZE);
         }
 
+        // close button: translucent red with a red edge
         boolean ch = NewUi.in(mx, my, closeBtn[0], closeBtn[1], closeBtn[2], closeBtn[3]);
-        int red = NewUi.rgb(214, 48, 54);
-        NewUi.frame(c, closeBtn[0], closeBtn[1], closeBtn[2], closeBtn[3], Math.max(3, sl(9)), red,
-                ch ? NewUi.rgb(78, 22, 26) : NewUi.rgb(38, 14, 17), ch ? NewUi.rgb(60, 17, 20) : NewUi.rgb(28, 11, 13));
-        int cx = closeBtn[0] + closeBtn[2] / 2;
-        int cy = closeBtn[1] + closeBtn[3] / 2;
-        int s = Math.max(3, closeBtn[3] / 5);
-        int xc = NewUi.rgb(236, 66, 72);
-        for (int t = -s; t <= s; t++) {
-            c.fill(cx + t, cy + t, cx + t + 2, cy + t + 1, xc);
-            c.fill(cx + t, cy - t, cx + t + 2, cy - t + 1, xc);
+        float cv = ease("close", ch ? 1f : 0f, 14f);
+        int crad = Math.max(3, sl(9));
+        int fill = NewUi.withAlpha(FhasixTheme.red(), 0.13f + 0.17f * cv);
+        NewUi.rrect(c, closeBtn[0], closeBtn[1], closeBtn[2], closeBtn[3], crad, fill, fill);
+        NewUi.ring(c, closeBtn[0], closeBtn[1], closeBtn[2], closeBtn[3], crad, mix(FhasixTheme.ring(), FhasixTheme.redHover(), cv));
+        int xs = Math.max(8, Math.round(closeBtn[3] * 0.50f));
+        NewUi.tex(c, FX_CLOSE, closeBtn[0] + (closeBtn[2] - xs) / 2, closeBtn[1] + (closeBtn[3] - xs) / 2, xs, FX_SIZE);
+    }
+
+    /** The small label that fades in above a hovered tab icon (and fades out when the pointer leaves). */
+    private void drawTips(DrawContext c) {
+        float sz = fs(14.5f);
+        for (int i = 0; i < FX.length; i++) {
+            Float a = anim.get("tip:" + i);
+            float ta = a == null ? 0f : a;
+            if (ta < 0.08f) {
+                continue;
+            }
+            int[] r = topBtn[i];
+            String s = FX_TIP[i];
+            int w = NewFont.widthUi(textRenderer, s, NewFont.W_BOLD, sz);
+            NewFont.drawUi(c, textRenderer, s, r[0] + (r[2] - w) / 2, r[1] - sl(26), NewUi.withAlpha(0xFFFFFFFF, ta), NewFont.W_BOLD, sz);
         }
     }
 
     private void drawToolbar(DrawContext c, int mx, int my) {
+        for (int i = 0; i < FX.length; i++) { // tooltips are driven here so they keep fading after the pointer leaves
+            int[] r = topBtn[i];
+            ease("tip:" + i, NewUi.in(mx, my, r[0], r[1], r[2], r[3]) ? 1f : 0f, 11f);
+        }
         String[] tabNames = tabs();
         for (int i = 0; i < tabNames.length; i++) {
             int[] r = tabRect[i];
             boolean active = i == tab;
             boolean h = NewUi.in(mx, my, r[0], r[1], r[2], r[3]);
+            float hv = ease("chip:" + i, h ? 1f : 0f, 14f);
             int rad = Math.max(3, sl(8));
             if (active) {
-                NewUi.rrect(c, r[0], r[1], r[2], r[3], rad, h ? RED_HT : RED_T, h ? RED_HB : RED_B);
+                int rc = mix(FhasixTheme.red(), FhasixTheme.redHover(), hv);
+                NewUi.rrect(c, r[0], r[1], r[2], r[3], rad, rc, rc);
             } else {
-                NewUi.rrect(c, r[0], r[1], r[2], r[3], rad, h ? HOV_T : BTN_T, h ? HOV_B : BTN_B);
+                int bc = mix(CHIP, OFF_H, hv);
+                NewUi.rrect(c, r[0], r[1], r[2], r[3], rad, bc, bc);
             }
-            c.drawText(textRenderer, tabNames[i], r[0] + (r[2] - textRenderer.getWidth(tabNames[i])) / 2,
-                    r[1] + (r[3] - textRenderer.fontHeight) / 2, active ? TXT : TXT_TAB, false);
+            float tsz = fs(15f);
+            int wgt = active ? NewFont.W_BOLD : NewFont.W_MED;
+            NewFont.drawUi(c, textRenderer, tabNames[i], r[0] + (r[2] - NewFont.widthUi(textRenderer, tabNames[i], wgt, tsz)) / 2,
+                    NewFont.centerYUi(r[1], r[3], tsz), active ? TXT : mix(TXT_TAB, TXT, hv), wgt, tsz);
         }
-        boolean sh = NewUi.in(mx, my, searchRect[0], searchRect[1], searchRect[2], searchRect[3]);
-        NewUi.rrect(c, searchRect[0], searchRect[1], searchRect[2], searchRect[3], Math.max(3, sl(8)),
-                sh ? HOV_T : BTN_T, sh ? HOV_B : BTN_B);
+        drawSearch(c, mx, my);
 
         boolean fh = NewUi.in(mx, my, favBtn[0], favBtn[1], favBtn[2], favBtn[3]);
-        NewUi.rrect(c, favBtn[0], favBtn[1], favBtn[2], favBtn[3], Math.max(3, sl(8)),
-                fh ? HOV_T : BTN_T, fh ? HOV_B : BTN_B);
+        int fc = mix(BTN, BTN_HOV, ease("fav", fh ? 1f : 0f, 14f));
+        NewUi.rrect(c, favBtn[0], favBtn[1], favBtn[2], favBtn[3], Math.max(3, sl(8)), fc, fc);
         int hs = Math.max(8, Math.round(favBtn[3] * 0.5f));
-        NewUi.icon(c, favOnly ? NewUi.ICON_HEART_ON : NewUi.ICON_HEART_OFF,
-                favBtn[0] + (favBtn[2] - hs) / 2, favBtn[1] + (favBtn[3] - hs) / 2, hs);
+        int fxp = favBtn[0] + (favBtn[2] - hs) / 2;
+        int fyp = favBtn[1] + (favBtn[3] - hs) / 2;
+        NewUi.icon(c, favOnly ? NewUi.ICON_HEART_ON : NewUi.ICON_HEART_OFF, fxp, fyp, hs);
+        if (!favOnly) {
+            dim(c, fxp, fyp, hs, fc, 0.45f);
+        }
 
         boolean gh = NewUi.in(mx, my, gridBtn[0], gridBtn[1], gridBtn[2], gridBtn[3]);
-        NewUi.rrect(c, gridBtn[0], gridBtn[1], gridBtn[2], gridBtn[3], Math.max(3, sl(8)),
-                gh ? HOV_T : BTN_T, gh ? HOV_B : BTN_B);
-        // Performance view: this button opens the device selector (High End / Medium / Low End)
-        int gridIcon = perf ? 34 + Math.max(0, NewPerf.device(client) - 1) : NewUi.ICON_GRID;
-        NewUi.icon(c, gridIcon, gridBtn[0] + (gridBtn[2] - hs) / 2, gridBtn[1] + (gridBtn[3] - hs) / 2, hs);
+        int gc = mix(BTN, BTN_HOV, ease("grid", gh ? 1f : 0f, 14f));
+        NewUi.rrect(c, gridBtn[0], gridBtn[1], gridBtn[2], gridBtn[3], Math.max(3, sl(8)), gc, gc);
+        int gridIcon = NewUi.ICON_GRID;
+        int gxp = gridBtn[0] + (gridBtn[2] - hs) / 2;
+        int gyp = gridBtn[1] + (gridBtn[3] - hs) / 2;
+        NewUi.icon(c, gridIcon, gxp, gyp, hs);
+        dim(c, gxp, gyp, hs, gc, 0.45f);
     }
 
-    /** Performance view: what the hovered mode does at its current value, in a small box next to the pointer. */
-    private void drawPerfHint(DrawContext c, List<NewModSettings.ModDef> list, int mx, int my) {
-        if (!inClip(mx, my)) {
-            return;
+    /** The search box: background, then the typed text (or the "Search" hint) and a blinking caret, all in Product Sans. */
+    private void drawSearch(DrawContext c, int mx, int my) {
+        boolean sh = NewUi.in(mx, my, searchRect[0], searchRect[1], searchRect[2], searchRect[3]);
+        int sc = mix(NewUi.rgb(25, 28, 31), NewUi.rgb(33, 37, 42), ease("search", sh ? 1f : 0f, 14f));
+        NewUi.rrect(c, searchRect[0], searchRect[1], searchRect[2], searchRect[3], Math.max(3, sl(8)), sc, sc);
+        float ssz = fs(15f);
+        int tx = searchRect[0] + sl(16);
+        int maxW = searchRect[2] - sl(32);
+        String q = searchField == null ? "" : searchField.getText();
+        int ty = NewFont.centerYUi(searchRect[1], searchRect[3], ssz);
+        int caretX = tx;
+        if (q.isEmpty()) {
+            NewFont.drawUi(c, textRenderer, "Search", tx, ty, 0xFF8A8D93, NewFont.W_MED, ssz);
+        } else {
+            String shown = q;
+            while (shown.length() > 1 && NewFont.widthUi(textRenderer, shown, NewFont.W_MED, ssz) > maxW) {
+                shown = shown.substring(1); // too long: show the end of what was typed
+            }
+            NewFont.drawUi(c, textRenderer, shown, tx, ty, TXT, NewFont.W_MED, ssz);
+            caretX = tx + NewFont.widthUi(textRenderer, shown, NewFont.W_MED, ssz);
         }
-        for (int i = 0; i < list.size(); i++) {
-            Geo g = geos[i];
-            if (!NewUi.in(mx, my, g.x, g.y, g.w, g.h)) {
-                continue;
-            }
-            int idx = NewPerf.indexOf(list.get(i).id);
-            int w = Math.min(sl(340), width - 12);
-            List<OrderedText> lines = textRenderer.wrapLines(Text.literal(NewPerf.DESC[idx][NewPerf.level(client, idx)]), w - sl(24));
-            int fh = textRenderer.fontHeight;
-            int h = sl(12) + fh + 4 + lines.size() * (fh + 2) + sl(12);
-            int x = Math.max(4, Math.min(width - w - 6, mx + 12));
-            int y = Math.max(4, Math.min(height - h - 6, my + 14));
-            NewUi.frame(c, x, y, w, h, Math.max(3, sl(8)), CARD_BORDER, PANEL_T, PANEL_B);
-            c.drawText(textRenderer, Text.literal(NewPerf.LABELS[idx]).formatted(Formatting.BOLD), x + sl(12), y + sl(12), TXT, false);
-            for (int l = 0; l < lines.size(); l++) {
-                c.drawText(textRenderer, lines.get(l), x + sl(12), y + sl(12) + fh + 4 + l * (fh + 2), TXT_DIM, false);
-            }
-            return;
+        if (searchField != null && searchField.isFocused() && (System.currentTimeMillis() / 500L) % 2L == 0L) {
+            int chh = Math.max(6, Math.round(searchRect[3] * 0.5f));
+            c.fill(caretX + 1, searchRect[1] + (searchRect[3] - chh) / 2, caretX + 1 + Math.max(1, sl(2)),
+                    searchRect[1] + (searchRect[3] - chh) / 2 + chh, TXT);
         }
     }
 
-    /** Moves a stored 0..1 value towards target (frame-rate independent); a first-seen card snaps, no animation on open. */
-    private float easeTo(Map<String, Float> map, String id, float target, float speed) {
-        if (NewPerf.animationsOff()) { // HUD Optimizer: no UI animations
-            map.put(id, target);
-            return target;
-        }
-        float cur = map.getOrDefault(id, target);
-        cur += (target - cur) * Math.min(1f, animDt * speed);
-        if (Math.abs(target - cur) < 0.004f) {
-            cur = target;
-        }
-        map.put(id, cur);
-        return cur;
-    }
+    // ---------------------------------------------------------------- cards
 
     private void drawCard(DrawContext c, NewModSettings.ModDef m, Geo g, int mx, int my, boolean over) {
-        int perfIdx = perf ? NewPerf.indexOf(m.id) : -1;
-        boolean enabled = perf ? NewPerf.on(client, perfIdx) : m.functional && NewModSettings.isEnabled(client, m.id);
+        boolean enabled = m.functional && NewModSettings.isEnabled(client, m.id);
         boolean hov = over && NewUi.in(mx, my, g.x, g.y, g.w, g.h);
+        float hv = ease(m.id + ":c", hov ? 1f : 0f, 14f);
+        float e = smooth(ease(m.id + ":on", enabled ? 1f : 0f, 9f));
         int cr = Math.max(3, sl(10));
 
-        NewUi.frame(c, g.x, g.y, g.w, g.h, cr, hov ? NewUi.rgb(44, 52, 64) : CARD_BORDER,
-                hov ? HOV_T : CARD_T, hov ? HOV_B : CARD_B);
-
-        // title (trimmed to leave room for the heart)
-        int nameMax = g.hx - g.nx - 3;
-        String name = m.name;
-        if (textRenderer.getWidth(name) > nameMax) {
-            name = textRenderer.trimToWidth(name, Math.max(0, nameMax - textRenderer.getWidth(".."))) + "..";
+        // card body: dark with the corner-lit edge (same as the title-screen buttons); on hover the slate
+        // diagonal gradient fades in and the edge fades out
+        if (hv <= 0.004f) {
+            NewUi.rrect(c, g.x, g.y, g.w, g.h, cr, CARD_T, CARD_B);
+            NewButtonArt.edge(c, g.x, g.y, g.w, g.h, cr, 0.20f); // same edge as Singleplayer / Multiplayer
+        } else {
+            NewUi.rrectDiag(c, g.x, g.y, g.w, g.h, cr, mix(CARD_T, HOV_TL, hv), mix(CARD_B, HOV_BR, hv), PANEL_BG);
+            NewButtonArt.edge(c, g.x, g.y, g.w, g.h, cr, 0.20f + 0.08f * hv); // same edge as Singleplayer / Multiplayer
         }
-        c.drawText(textRenderer, name, g.nx, g.ny, enabled ? TXT : TXT_DIM, false);
+
+        // title: white bold when the mod is on, grey when off (fades between the two)
+        float tsz = fs(18f);
+        int wgt = e > 0.5f ? NewFont.W_BOLD : NewFont.W_MED;
+        String name = NewFont.fitUi(textRenderer, m.name, wgt, tsz, g.hx - g.nx - sl(8));
+        NewFont.drawUi(c, textRenderer, name, g.nx, cyUi(g.y + sl(34), tsz), mix(TXT_DIM, TXT, e), wgt, tsz);
 
         // heart
         boolean hh = over && NewUi.in(mx, my, g.hx, g.hy, g.hs, g.hs);
-        NewUi.rrect(c, g.hx, g.hy, g.hs, g.hs, Math.max(3, sl(7)), hh ? HOV_T : BTN_T, hh ? HOV_B : BTN_B);
+        float hhv = ease(m.id + ":h", hh ? 1f : 0f, 16f);
+        int hbg = mix(mix(BTN, NewUi.rgb(47, 53, 61), hv), NewUi.rgb(62, 68, 77), hhv);
+        NewUi.rrect(c, g.hx, g.hy, g.hs, g.hs, Math.max(3, sl(7)), hbg, hbg);
         int hi = Math.max(8, Math.round(g.hs * 0.55f));
-        NewUi.icon(c, NewModSettings.isFavorite(client, m.id) ? NewUi.ICON_HEART_ON : NewUi.ICON_HEART_OFF,
-                g.hx + (g.hs - hi) / 2, g.hy + (g.hs - hi) / 2, hi);
+        boolean fav = NewModSettings.isFavorite(client, m.id);
+        int hix = g.hx + (g.hs - hi) / 2;
+        int hiy = g.hy + (g.hs - hi) / 2;
+        NewUi.icon(c, fav ? NewUi.ICON_HEART_ON : NewUi.ICON_HEART_OFF, hix, hiy, hi);
+        if (!fav) {
+            dim(c, hix, hiy, hi, hbg, 0.45f);
+        }
 
-        // icon, dimmed while the mod is off
+        // mod icon: white when the mod is on, grey when off (the colour behind it is laid over it)
         NewUi.icon(c, m.icon, g.ix, g.iy, g.is);
-        if (!enabled && !hov) {
-            c.fill(g.ix, g.iy, g.ix + g.is, g.iy + g.is, 0x8C0F1115);
-        }
+        dim(c, g.ix, g.iy, g.is, mix(CARD_T, HOV_MID, hv), 0.50f * (1f - e));
 
-        // NEW! badge
-        if (m.isNew) {
-            int bw = textRenderer.getWidth("NEW!") + 6;
-            int bh = textRenderer.fontHeight + 3;
-            int bx = g.x - sl(6);
-            int by = g.y - sl(3);
-            NewUi.rrect(c, bx, by, bw, bh, 2, NEW_T, NEW_B);
-            c.drawText(textRenderer, "NEW!", bx + 3, by + 2, TXT, false);
-        }
-
-        if (perf) {
-            // value chips: Small / Medium / High (High = most FPS)
-            int lvl = NewPerf.level(client, perfIdx);
-            for (int j = 0; j < 3; j++) {
-                int chx = g.cx + j * (g.cw + g.cgap);
-                boolean chh = over && NewUi.in(mx, my, chx, g.cy, g.cw, g.ch);
-                int crad = Math.max(2, sl(7));
-                if (j == lvl && enabled) {
-                    NewUi.rrect(c, chx, g.cy, g.cw, g.ch, crad, chh ? RED_HT : RED_T, chh ? RED_HB : RED_B);
-                } else if (j == lvl) {
-                    NewUi.rrect(c, chx, g.cy, g.cw, g.ch, crad, HOV_T, HOV_B);
-                } else {
-                    NewUi.rrect(c, chx, g.cy, g.cw, g.ch, crad, chh ? HOV_T : BTN_T, chh ? HOV_B : BTN_B);
-                }
-                String cl = NewPerf.LEVELS[j];
-                c.drawText(textRenderer, cl, chx + (g.cw - textRenderer.getWidth(cl)) / 2,
-                        g.cy + (g.ch - textRenderer.fontHeight) / 2, j == lvl || chh ? TXT : TXT_DIM, false);
-            }
-        } else {
+        float psz = fs(14.5f);
+        {
             // gear
             boolean gh = over && NewUi.in(mx, my, g.gx, g.gy, g.gs, g.gs);
-            NewUi.rrect(c, g.gx, g.gy, g.gs, g.gs, Math.max(3, sl(8)), gh ? HOV_T : BTN_T, gh ? HOV_B : BTN_B);
+            float gv = ease(m.id + ":g", gh ? 1f : 0f, 16f);
+            int gbg = mix(mix(BTN, NewUi.rgb(47, 53, 61), hv), NewUi.rgb(62, 68, 77), gv);
+            NewUi.rrect(c, g.gx, g.gy, g.gs, g.gs, Math.max(3, sl(8)), gbg, gbg);
             int gi = Math.max(8, Math.round(g.gs * 0.6f));
-            NewUi.icon(c, NewUi.ICON_GEAR, g.gx + (g.gs - gi) / 2, g.gy + (g.gs - gi) / 2, gi);
+            int gix = g.gx + (g.gs - gi) / 2;
+            int giy = g.gy + (g.gs - gi) / 2;
+            NewUi.icon(c, NewUi.ICON_GEAR, gix, giy, gi);
+            dim(c, gix, giy, gi, gbg, 0.45f);
         }
 
-        // Enabled / Disabled pill
+        // Enabled / Disabled pill: colour crossfade + a ripple that spreads from the click point
         boolean ph = over && m.functional && NewUi.in(mx, my, g.px, g.py, g.pw, g.ph);
-        // animated pill: the green fills in from the left when switched on (and drains when off),
-        // a light edge sweeps along while it moves, and the hover glow fades in / out
-        float t = easeTo(pillOn, m.id, enabled ? 1f : 0f, 9f);
-        float e = t * t * (3f - 2f * t);
-        float hv = easeTo(pillHover, m.id, ph ? 1f : 0f, 14f);
+        float pv = ease(m.id + ":p", ph ? 1f : 0f, 14f);
+        int base = mix(mix(BTN, NewUi.rgb(47, 53, 61), hv * 0.6f), ON, e);
+        int hovc = mix(OFF_H, ON_H, e);
+        int pc = mix(base, hovc, pv);
         int rad = Math.max(3, sl(8));
-        NewUi.rrect(c, g.px, g.py, g.pw, g.ph, rad, NewUi.lerp(BTN_T, HOV_T, hv), NewUi.lerp(BTN_B, HOV_B, hv));
-        int fillW = Math.round(g.pw * e);
-        if (fillW > 0) {
-            NewUi.rrect(c, g.px, g.py, fillW, g.ph, rad, NewUi.lerp(ON_T, ON_HT, hv), NewUi.lerp(ON_B, ON_HB, hv));
-        }
-        if (t > 0.02f && t < 0.98f) {
-            int edge = Math.max(2, sl(3));
-            int ex = g.px + Math.max(0, Math.min(g.pw - edge, fillW - edge / 2));
-            c.fill(ex, g.py + 2, ex + edge, g.py + g.ph - 2, 0x40FFFFFF);
+        NewUi.rrect(c, g.px, g.py, g.pw, g.ph, rad, pc, pc);
+        long[] rp = ripples.get(m.id);
+        if (rp != null) {
+            float p = (System.nanoTime() - rp[0]) / 450_000_000f;
+            if (p >= 1f) {
+                ripples.remove(m.id);
+            } else {
+                float ep = 1f - (1f - p) * (1f - p);
+                float far = (float) Math.hypot(Math.max(rp[1] - g.px, g.px + g.pw - rp[1]), Math.max(rp[2] - g.py, g.py + g.ph - rp[2]));
+                int rc = NewUi.withAlpha(0xFFFFFFFF, 0.30f * (1f - p) + 0.02f);
+                NewUi.ripple(c, g.px, g.py, g.pw, g.ph, rad, rp[1], rp[2], far * ep, rc);
+            }
         }
         String label = e >= 0.5f ? "Enabled" : "Disabled";
-        c.drawText(textRenderer, label, g.px + (g.pw - textRenderer.getWidth(label)) / 2,
-                g.py + (g.ph - textRenderer.fontHeight) / 2, NewUi.lerp(TXT_DIM, TXT_ON, e), false);
+        NewFont.drawUi(c, textRenderer, label, g.px + (g.pw - NewFont.widthUi(textRenderer, label, NewFont.W_MED, psz)) / 2,
+                NewFont.centerYUi(g.py, g.ph, psz), mix(TXT_DIM, TXT_ON, e), NewFont.W_MED, psz);
     }
 
     // ---------------------------------------------------------------- input
@@ -674,29 +854,39 @@ public final class NewModMenuScreen extends Screen {
         }
         double mx = click.x();
         double my = click.y();
+        if (navAction != null) {
+            return true;
+        }
+        if (searchField != null && !NewUi.in(mx, my, searchRect[0], searchRect[1], searchRect[2], searchRect[3])) {
+            this.setFocused(null); // clicking anywhere else stops typing into the search box
+        }
         if (NewUi.in(mx, my, closeBtn[0], closeBtn[1], closeBtn[2], closeBtn[3])) {
+            NewUi.click(client);
             closeMenu();
             return true;
         }
-        if (NewUi.in(mx, my, topBtn[0][0], topBtn[0][1], topBtn[0][2], topBtn[0][3])
-                || (perf && NewUi.in(mx, my, modTab[0], modTab[1], modTab[2], modTab[3]))) {
-            // top bar gear: Mod Menu <-> Performance
-            client.setScreen(new NewModMenuScreen(parent, !perf));
-            return true;
-        }
-        if (perf && NewUi.in(mx, my, gridBtn[0], gridBtn[1], gridBtn[2], gridBtn[3])) {
-            client.setScreen(new NewDeviceSelectorScreen(this));
-            return true;
+        // top bar: Performance (gear), General (screen) and Mod Profiles open their settings pages (ripple, then swap)
+        int[] pageOf = {NewSettingsScreen.PAGE_PERF, 0, 0, 0, NewSettingsScreen.PAGE_GENERAL, 0, NewSettingsScreen.PAGE_PROFILES};
+        for (int i = 0; i < FX.length; i++) {
+            int[] tb = topBtn[i];
+            if (pageOf[i] != 0 && NewUi.in(mx, my, tb[0], tb[1], tb[2], tb[3])) {
+                NewUi.click(client);
+                final int target = pageOf[i];
+                navRipple(tb, Math.max(3, sl(10)), mx, my, () -> client.setScreen(new NewSettingsScreen(parent, target)));
+                return true;
+            }
         }
         for (int i = 0; i < tabs().length; i++) {
             int[] r = tabRect[i];
             if (NewUi.in(mx, my, r[0], r[1], r[2], r[3])) {
+                NewUi.click(client);
                 tab = i;
                 scrollTarget = 0f;
                 return true;
             }
         }
         if (NewUi.in(mx, my, favBtn[0], favBtn[1], favBtn[2], favBtn[3])) {
+            NewUi.click(client);
             favOnly = !favOnly;
             scrollTarget = 0f;
             return true;
@@ -735,19 +925,24 @@ public final class NewModMenuScreen extends Screen {
             if (!dragScrolling && pressed != null && pressed.kind != HIT_NONE) {
                 Hit now = hitAt(click.x(), click.y());
                 if (now.kind == pressed.kind && now.mod == pressed.mod && now.arg == pressed.arg) {
+                    if (pressed.kind != HIT_CARD) {
+                        NewUi.click(client);
+                    }
                     if (pressed.kind == HIT_HEART) {
                         NewModSettings.toggleFavorite(client, pressed.mod.id);
-                    } else if (pressed.kind == HIT_PILL && perf) {
-                        int pi = NewPerf.indexOf(pressed.mod.id);
-                        NewPerf.setOn(client, pi, !NewPerf.on(client, pi));
-                    } else if (pressed.kind == HIT_CHIP) {
-                        NewPerf.setLevel(client, NewPerf.indexOf(pressed.mod.id), pressed.arg);
                     } else if (pressed.kind == HIT_PILL) {
+                        ripples.put(pressed.mod.id, new long[]{System.nanoTime(), (long) click.x(), (long) click.y()});
                         NewModSettings.toggle(client, pressed.mod);
                     }
                     else if (pressed.kind == HIT_GEAR && pressed.mod.functional
                             && !NewModOptions.forMod(pressed.mod.id).isEmpty()) {
-                        client.setScreen(new NewModOptionsScreen(this, pressed.mod));
+                        int[] gr = gearRect(pressed.mod);
+                        if (gr != null) {
+                            navRipple(gr, Math.max(3, sl(8)), click.x(), click.y(),
+                                    () -> client.setScreen(new NewModOptionsScreen(this, pressed.mod)));
+                        } else {
+                            client.setScreen(new NewModOptionsScreen(this, pressed.mod));
+                        }
                     }
                     // HIT_CARD: decorative for now
                 }

@@ -15,7 +15,10 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
 import java.util.Hashtable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,6 +42,17 @@ import java.util.function.Consumer;
  */
 public final class FhasixServerPinger {
 
+    /** One coloured piece of the server's description (MOTD). rgb = 0xRRGGBB, or -1 for "default colour". */
+    public static final class MotdSeg {
+        public final String text;
+        public final int rgb;
+
+        MotdSeg(String text, int rgb) {
+            this.text = text;
+            this.rgb = rgb;
+        }
+    }
+
     /** What one ping attempt found out about a server. */
     public static final class Result {
         public final boolean online;
@@ -47,16 +61,19 @@ public final class FhasixServerPinger {
         public final int playersMax;
         /** Raw PNG bytes of the server icon (64x64), or null. */
         public final byte[] favicon;
+        /** The server description as coloured pieces (may contain '\n'); empty if the server sent none. */
+        public final List<MotdSeg> motd;
 
-        Result(boolean online, int pingMs, int playersOnline, int playersMax, byte[] favicon) {
+        Result(boolean online, int pingMs, int playersOnline, int playersMax, byte[] favicon, List<MotdSeg> motd) {
             this.online = online;
             this.pingMs = pingMs;
             this.playersOnline = playersOnline;
             this.playersMax = playersMax;
             this.favicon = favicon;
+            this.motd = motd == null ? Collections.<MotdSeg>emptyList() : motd;
         }
 
-        static final Result OFFLINE = new Result(false, -1, 0, 0, null);
+        static final Result OFFLINE = new Result(false, -1, 0, 0, null, null);
     }
 
     private static final int DEFAULT_PORT = 25565;
@@ -190,8 +207,14 @@ public final class FhasixServerPinger {
             int online = 0;
             int max = 0;
             byte[] favicon = null;
+            List<MotdSeg> motd = new ArrayList<>();
             try {
                 JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+                try {
+                    collectMotd(root.get("description"), -1, motd);
+                } catch (RuntimeException ignored) {
+                    // odd description JSON - the card just shows no description
+                }
                 if (root.has("players") && root.get("players").isJsonObject()) {
                     JsonObject players = root.getAsJsonObject("players");
                     online = intOf(players, "online");
@@ -208,7 +231,101 @@ public final class FhasixServerPinger {
             } catch (RuntimeException ignored) {
                 // The server did answer - odd JSON just means no player count / icon.
             }
-            return new Result(true, (int) Math.max(1L, pingMs), online, max, favicon);
+            return new Result(true, (int) Math.max(1L, pingMs), online, max, favicon, motd);
+        }
+    }
+
+    // ---- description (MOTD) parsing -------------------------------------------------------
+
+    private static final String[] COLOR_NAMES = {"black", "dark_blue", "dark_green", "dark_aqua", "dark_red",
+            "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white"};
+    private static final int[] COLOR_RGB = {0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00,
+            0xAAAAAA, 0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
+    private static final int MOTD_MAX_CHARS = 220;
+
+    private static int colorOf(String name) {
+        if (name == null) {
+            return -1;
+        }
+        if (name.length() == 7 && name.charAt(0) == '#') {
+            try {
+                return Integer.parseInt(name.substring(1), 16);
+            } catch (NumberFormatException ignored) {
+                return -1;
+            }
+        }
+        for (int i = 0; i < COLOR_NAMES.length; i++) {
+            if (COLOR_NAMES[i].equals(name)) {
+                return COLOR_RGB[i];
+            }
+        }
+        return -1;
+    }
+
+    private static int totalChars(List<MotdSeg> out) {
+        int n = 0;
+        for (MotdSeg seg : out) {
+            n += seg.text.length();
+        }
+        return n;
+    }
+
+    /** Walks a chat-component description (string, object with text/extra/color, or array). */
+    private static void collectMotd(JsonElement e, int inherited, List<MotdSeg> out) {
+        if (e == null || e.isJsonNull() || totalChars(out) >= MOTD_MAX_CHARS) {
+            return;
+        }
+        if (e.isJsonPrimitive()) {
+            addLegacy(e.getAsString(), inherited, out);
+        } else if (e.isJsonArray()) {
+            for (JsonElement part : e.getAsJsonArray()) {
+                collectMotd(part, inherited, out);
+            }
+        } else if (e.isJsonObject()) {
+            JsonObject o = e.getAsJsonObject();
+            int rgb = inherited;
+            if (o.has("color") && o.get("color").isJsonPrimitive()) {
+                int c = colorOf(o.get("color").getAsString());
+                if (c >= 0) {
+                    rgb = c;
+                }
+            }
+            if (o.has("text") && o.get("text").isJsonPrimitive()) {
+                addLegacy(o.get("text").getAsString(), rgb, out);
+            }
+            if (o.has("extra") && o.get("extra").isJsonArray()) {
+                for (JsonElement part : o.getAsJsonArray("extra")) {
+                    collectMotd(part, rgb, out);
+                }
+            }
+        }
+    }
+
+    /** Splits text on the legacy section-sign colour codes; other format codes are dropped. */
+    private static void addLegacy(String text, int base, List<MotdSeg> out) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        int current = base;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '\u00a7' && i + 1 < text.length()) {
+                char code = Character.toLowerCase(text.charAt(++i));
+                int idx = "0123456789abcdef".indexOf(code);
+                if (idx >= 0 || code == 'r') {
+                    if (sb.length() > 0) {
+                        out.add(new MotdSeg(sb.toString(), current));
+                        sb.setLength(0);
+                    }
+                    current = idx >= 0 ? COLOR_RGB[idx] : base;
+                }
+                continue;
+            }
+            sb.append(ch);
+        }
+        if (sb.length() > 0) {
+            out.add(new MotdSeg(sb.toString(), current));
         }
     }
 

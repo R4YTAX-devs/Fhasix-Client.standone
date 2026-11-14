@@ -15,9 +15,9 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
  * renderer's private method that writes colour + environmentalStart/End + renderDistanceStart/End
  * (+ sky/cloud end) into the buffer - find the real name/descriptor in 1.21.11 and fix the "method"
  * strings. The float arguments are modified by ordinal (0 = environmental start, 1 = environmental
- * end, 2 = render distance start, 3 = render distance end, 4 = sky end). Sky end is only pushed out
- * (see NewFog.skyEnd) so the custom fog colour does not repaint the sky. require = 0, so a wrong
- * target just disables the mod instead of crashing.
+ * end, 2 = render distance start, 3 = render distance end, 4 = sky end, 5 = cloud end). Sky end and
+ * cloud end are pulled in to the world fog's end while a custom colour is on (see NewFog) so the sky and the
+ * clouds take the colour as well. require = 0, so a wrong target just disables the mod instead of crashing.
  */
 @Mixin(FogRenderer.class)
 public abstract class NewFogMixin {
@@ -53,5 +53,10 @@ public abstract class NewFogMixin {
     @ModifyVariable(method = WRITE, at = @At("HEAD"), argsOnly = true, ordinal = 4, require = 0)
     private float fhasix$skyEnd(float v) {
         return NewFog.skyEnd(v);
+    }
+
+    @ModifyVariable(method = WRITE, at = @At("HEAD"), argsOnly = true, ordinal = 5, require = 0)
+    private float fhasix$cloudEnd(float v) {
+        return NewFog.cloudEnd(v);
     }
 }

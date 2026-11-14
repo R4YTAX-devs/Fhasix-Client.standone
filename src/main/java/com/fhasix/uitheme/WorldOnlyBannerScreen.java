@@ -31,9 +31,9 @@ public final class WorldOnlyBannerScreen extends Screen {
 
         a1.drawRoundedGradientRect(context, x, y, w, h,
                 new int[]{14, 17, 22}, new int[]{9, 10, 14}, 250);
-        context.drawCenteredTextWithShadow(textRenderer,
+        NewFont.drawCentered(context, textRenderer,
                 "This is only accessible in world", width / 2, y + 42, 0xFFFFFFFF);
-        context.drawCenteredTextWithShadow(textRenderer,
+        NewFont.drawCentered(context, textRenderer,
                 "Click anywhere to return", width / 2, y + h - 28, 0xFF7F8388);
     }
 

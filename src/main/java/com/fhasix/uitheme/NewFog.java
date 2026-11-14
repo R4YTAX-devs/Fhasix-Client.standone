@@ -11,9 +11,12 @@ import org.joml.Vector4f;
  * turned off elsewhere (the fog values arrive as "infinite"), real fog distances are put back so the
  * mod's colour / distance settings actually show.
  *
- * The sky is drawn with the same fog uniform (it fades into the fog colour out to "sky end"), so
- * skyEnd() pushes that distance out while a custom colour is on - only the world fog takes the
- * colour and the sky keeps its own.
+ * The sky and the clouds are drawn with the same fog uniform (they fade into the fog colour out to "sky end"
+ * and "cloud end"). While a custom colour is on, skyEnd() and cloudEnd() are pulled in to the world fog's end
+ * distance, so the whole environment - ground (down), clouds (middle) and sky (up) - is covered by the fog colour.
+ *
+ * The Fog Optimizer (Performance page, a single switch) does the same job as this mod at distance 60% with the
+ * normal fog colour: it works on its own, without this mod being on. If both are on, this mod's settings win.
  */
 public final class NewFog {
 
@@ -30,6 +33,12 @@ public final class NewFog {
         return c != null && c.world != null && c.options != null && NewModSettings.isEnabled(c, ID);
     }
 
+    /** The Performance page's Fog Optimizer switch (only counts while this mod is off). */
+    private static boolean optimizer() {
+        MinecraftClient c = MinecraftClient.getInstance();
+        return c != null && c.world != null && c.options != null && NewPerf.fogOptimizer();
+    }
+
     /** Fog colour; the original colour (with fog forced on) when "Custom color" is off. */
     public static Vector4f color(Vector4f original) {
         try {
@@ -42,6 +51,9 @@ public final class NewFog {
 
     private static Vector4f colorImpl(Vector4f original) {
         if (!active()) {
+            if (optimizer()) { // normal colour, fog forced on
+                return original == null ? null : new Vector4f(original.x, original.y, original.z, 1f);
+            }
             return original;
         }
         MinecraftClient c = MinecraftClient.getInstance();
@@ -52,7 +64,7 @@ public final class NewFog {
         return new Vector4f(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f, 1f);
     }
 
-    /** Sky fog distance: pushed out while a custom colour is on so the sky is not tinted by it. */
+    /** Sky fog distance: pulled in to the world fog end while a custom colour is on, so the sky takes the colour too. */
     public static float skyEnd(float original) {
         try {
             return skyEndImpl(original);
@@ -67,8 +79,20 @@ public final class NewFog {
             return original;
         }
         MinecraftClient c = MinecraftClient.getInstance();
-        return NewModSettings.optBool(c, ID, "color") ? Float.MAX_VALUE : original;
+        if (!NewModSettings.optBool(c, ID, "color") || NewModSettings.optBool(c, ID, "off")) {
+            return original;
+        }
+        float end = lastEnvEnd;
+        return end > 1f ? Math.min(original, end) : original;
     }
+
+    /** Cloud fog distance: pulled in like the sky end, so the clouds in the middle take the colour too. */
+    public static float cloudEnd(float original) {
+        return skyEnd(original);
+    }
+
+    /** The world fog end distance of the last frame (what the sky end / cloud end are pulled in to). */
+    private static float lastEnvEnd = 0f;
 
     /**
      * Fog start/end distance. kind: 0 = environmental start, 1 = environmental end, 2 = render
@@ -84,11 +108,12 @@ public final class NewFog {
     }
 
     private static float distanceImpl(float original, int kind) {
-        if (!active()) {
+        boolean custom = active();
+        if (!custom && !optimizer()) {
             return original;
         }
         MinecraftClient c = MinecraftClient.getInstance();
-        if (NewModSettings.optBool(c, ID, "off")) {
+        if (custom && NewModSettings.optBool(c, ID, "off")) {
             return 100000f;
         }
         float v = original;
@@ -102,6 +127,10 @@ public final class NewFog {
                 default: v = r; break;
             }
         }
-        return v * (NewModSettings.opt(c, ID, "dist") / 100f);
+        v = v * ((custom ? NewModSettings.opt(c, ID, "dist") : 60) / 100f); // Fog Optimizer = distance 60%
+        if (kind == 1) {
+            lastEnvEnd = v;
+        }
+        return v;
     }
 }

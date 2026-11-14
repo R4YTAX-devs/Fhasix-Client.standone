@@ -76,26 +76,26 @@ public final class NewCrashScreen extends Screen {
 
         int pad = sl(40);
         int y = panel[1] + sl(44);
-        c.drawText(textRenderer, Text.literal("Your game has crashed!").formatted(Formatting.BOLD),
+        NewFont.draw(c, textRenderer, Text.literal("Your game has crashed!").formatted(Formatting.BOLD),
                 panel[0] + pad, y, 0xFFE73C40, false);
         y += textRenderer.fontHeight + sl(14);
-        c.drawText(textRenderer, "No Crash caught the error so the game stayed open.", panel[0] + pad, y, NewUi.TXT, false);
+        NewFont.draw(c, textRenderer, "No Crash caught the error so the game stayed open.", panel[0] + pad, y, NewUi.TXT, false);
         y += textRenderer.fontHeight + sl(10);
         if (showDetail) {
             int max = panel[2] - pad * 2;
-            String d = textRenderer.getWidth(detail) > max
-                    ? textRenderer.trimToWidth(detail, Math.max(0, max - textRenderer.getWidth(".."))) + ".."
+            String d = NewFont.width(textRenderer, detail) > max
+                    ? textRenderer.trimToWidth(detail, Math.max(0, max - NewFont.width(textRenderer, ".."))) + ".."
                     : detail;
-            c.drawText(textRenderer, d, panel[0] + pad, y, NewUi.TXT_DIM, false);
+            NewFont.draw(c, textRenderer, d, panel[0] + pad, y, NewUi.TXT_DIM, false);
             y += textRenderer.fontHeight + sl(6);
-            c.drawText(textRenderer, "Full details are in the game log.", panel[0] + pad, y, NewUi.TXT_DIM, false);
+            NewFont.draw(c, textRenderer, "Full details are in the game log.", panel[0] + pad, y, NewUi.TXT_DIM, false);
         }
 
         boolean h = NewUi.in(mx, my, button[0], button[1], button[2], button[3]);
         NewUi.rrect(c, button[0], button[1], button[2], button[3], Math.max(3, sl(10)),
-                h ? NewUi.RED_HT : NewUi.RED_T, h ? NewUi.RED_HB : NewUi.RED_B);
+                h ? NewUi.redHT() : NewUi.redT(), h ? NewUi.redHB() : NewUi.redB());
         Text label = Text.literal("RETURN TO TITLE SCREEN").formatted(Formatting.BOLD);
-        c.drawText(textRenderer, label, button[0] + (button[2] - textRenderer.getWidth(label)) / 2,
+        NewFont.draw(c, textRenderer, label, button[0] + (button[2] - NewFont.width(textRenderer, label)) / 2,
                 button[1] + (button[3] - textRenderer.fontHeight) / 2, NewUi.TXT, false);
     }
 

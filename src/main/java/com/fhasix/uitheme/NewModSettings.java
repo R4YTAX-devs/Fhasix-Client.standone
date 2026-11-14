@@ -81,6 +81,12 @@ public final class NewModSettings {
             new ModDef("time_changer", "Time Changer", 0, true, true, 31),
             new ModDef("weather_changer", "Weather Changer", 0, true, true, 32),
             new ModDef("tnt_timer", "TNT Timer", TAG_PVP, true, true, 33),
+            new ModDef("combo_display", "Combo Display", TAG_HUD | TAG_PVP, true, true, 50),
+            new ModDef("server_address", "Server Address", TAG_HUD, true, true, 51),
+            new ModDef("reach_display", "Reach Display", TAG_HUD | TAG_PVP, true, true, 52),
+            new ModDef("playtime", "Playtime", TAG_HUD, true, true, 53),
+            new ModDef("ping", "Ping", TAG_HUD | TAG_PVP, true, true, 54),
+            new ModDef("pack_display", "Pack Display", TAG_HUD, true, true, 55),
             new ModDef("dark_mode", "Dark Mode", 0, true, true, 22),
             new ModDef("auto_text", "Auto Text", TAG_HYPIXEL, false, false, 11)
     );

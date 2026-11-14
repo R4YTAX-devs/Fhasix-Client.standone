@@ -118,7 +118,7 @@ final class NewOreHighlight {
         List<Integer> cols = colors;
         float alpha = NewModSettings.opt(c, ID, "oalpha") / 100f;
         MatrixStack ms = context.matrices();
-        Vec3d cam = c.gameRenderer.getCamera().getPos();
+        Vec3d cam = c.gameRenderer.getCamera().getCameraPos();
         VertexConsumer vc = context.consumers().getBuffer(com.fhasix.uitheme.mixin.RenderLayersAccessor.fhasix$lines());
         final double e = 0.002;
         for (int i = 0; i < pos.size() && i < cols.size(); i++) {

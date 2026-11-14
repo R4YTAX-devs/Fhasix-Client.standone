@@ -31,6 +31,8 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
+    // Show many compiler diagnostics in one build instead of stopping at javac's default cap.
+    it.options.compilerArgs += ['-Xmaxerrs', '1000', '-Xdiags:verbose']
 }
 
 java {

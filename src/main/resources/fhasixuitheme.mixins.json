@@ -6,7 +6,6 @@
   "client": [
     "f6",
     "loading",
-    "cape",
     "skin",
     "NewCameraMixin",
     "NewLookMixin",

@@ -104,6 +104,26 @@ final class NewModOptions {
         textStyle(cps);
         BY_MOD.put("cps_display", cps);
 
+        String[][] extra = {
+                {"combo_display", "Show \"Combo\" label"},
+                {"server_address", "Show \"Server\" label"},
+                {"reach_display", "Show \"blocks\" label"},
+                {"ping", "Show \"ms\" label"},
+                {"pack_display", "Show \"Pack\" label"}
+        };
+        for (String[] ex : extra) {
+            List<Opt> l = new ArrayList<>();
+            l.add(toggle("label", ex[1], true));
+            backdrop(l);
+            textStyle(l);
+            BY_MOD.put(ex[0], l);
+        }
+        List<Opt> playtime = new ArrayList<>();
+        playtime.add(toggle("seconds", "Show seconds", true));
+        backdrop(playtime);
+        textStyle(playtime);
+        BY_MOD.put("playtime", playtime);
+
         List<Opt> as = new ArrayList<>();
         as.add(choice("mode", "Durability", 0, "Value", "Percent"));
         as.add(toggle("colordur", "Color by durability", true));

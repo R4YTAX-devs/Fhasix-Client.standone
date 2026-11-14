@@ -126,7 +126,7 @@ public final class NewDeviceSelectorScreen extends Screen {
     }
 
     private void centerText(DrawContext c, Text t, int cx, int y, int color) {
-        c.drawText(textRenderer, t, cx - textRenderer.getWidth(t) / 2, y, color, false);
+        NewFont.draw(c, textRenderer, t, cx - NewFont.width(textRenderer, t) / 2, y, color, false);
     }
 
     @Override
@@ -160,7 +160,7 @@ public final class NewDeviceSelectorScreen extends Screen {
             hovT[i] += ((hov ? 1f : 0f) - hovT[i]) * ease;
             int lift = Math.round((selT[i] * 8f + hovT[i] * 3f) * k);
             int y = r[1] - lift;
-            int border = NewUi.lerp(NewUi.CARD_BORDER, NewUi.RED_T, selT[i]);
+            int border = NewUi.lerp(NewUi.CARD_BORDER, NewUi.redT(), selT[i]);
             NewUi.frame(c, r[0], y, r[2], r[3], Math.max(3, sl(14)), border,
                     NewUi.lerp(NewUi.CARD_T, NewUi.HOV_T, Math.max(hovT[i] * 0.6f, selT[i] * 0.35f)),
                     NewUi.lerp(NewUi.CARD_B, NewUi.HOV_B, Math.max(hovT[i] * 0.6f, selT[i] * 0.35f)));
@@ -172,22 +172,22 @@ public final class NewDeviceSelectorScreen extends Screen {
             List<OrderedText> lines = textRenderer.wrapLines(Text.literal(LINES[i]), r[2] - sl(44));
             for (int l = 0; l < Math.min(5, lines.size()); l++) {
                 OrderedText ot = lines.get(l);
-                c.drawText(textRenderer, ot, cx - textRenderer.getWidth(ot) / 2,
+                NewFont.draw(c, textRenderer, ot, cx - NewFont.width(textRenderer, ot) / 2,
                         y + sl(196) + l * (textRenderer.fontHeight + 2), NewUi.TXT_DIM, false);
             }
             // tag pill at the bottom of the card
             String tag = TAGS[i];
-            int tw = textRenderer.getWidth(tag) + sl(26);
+            int tw = NewFont.width(textRenderer, tag) + sl(26);
             int th = textRenderer.fontHeight + sl(14);
             int tx = cx - tw / 2;
             int ty = y + r[3] - th - sl(24);
             if (i == 2) {
                 NewUi.rrect(c, tx, ty, tw, th, th / 2, NewUi.ON_T, NewUi.ON_B);
-                c.drawText(textRenderer, tag, tx + (tw - textRenderer.getWidth(tag)) / 2, ty + (th - textRenderer.fontHeight) / 2,
+                NewFont.draw(c, textRenderer, tag, tx + (tw - NewFont.width(textRenderer, tag)) / 2, ty + (th - textRenderer.fontHeight) / 2,
                         NewUi.TXT_ON, false);
             } else {
                 NewUi.rrect(c, tx, ty, tw, th, th / 2, NewUi.BTN_T, NewUi.BTN_B);
-                c.drawText(textRenderer, tag, tx + (tw - textRenderer.getWidth(tag)) / 2, ty + (th - textRenderer.fontHeight) / 2,
+                NewFont.draw(c, textRenderer, tag, tx + (tw - NewFont.width(textRenderer, tag)) / 2, ty + (th - textRenderer.fontHeight) / 2,
                         NewUi.TXT_DIM, false);
             }
             // selected check
@@ -213,7 +213,7 @@ public final class NewDeviceSelectorScreen extends Screen {
         boolean ch = can && rippleStart < 0 && NewUi.in(mx, my, confirmR[0], confirmR[1], confirmR[2], confirmR[3]);
         int rad = Math.max(3, sl(14));
         NewUi.rrect(c, confirmR[0], confirmR[1], confirmR[2], confirmR[3], rad,
-                NewUi.lerp(NewUi.BTN_T, ch ? NewUi.RED_HT : NewUi.RED_T, confirmT), NewUi.lerp(NewUi.BTN_B, NewUi.RED_B, confirmT));
+                NewUi.lerp(NewUi.BTN_T, ch ? NewUi.redHT() : NewUi.redT(), confirmT), NewUi.lerp(NewUi.BTN_B, NewUi.redB(), confirmT));
         if (rippleStart >= 0) {
             float t = Math.min(1f, (now - rippleStart) / (float) RIPPLE_NS);
             float e = 1f - (1f - t) * (1f - t) * (1f - t);
@@ -225,8 +225,8 @@ public final class NewDeviceSelectorScreen extends Screen {
             c.disableScissor();
         }
         String label = rippleStart >= 0 ? "Setting up..." : (can ? "Confirm" : "Choose a device");
-        c.drawText(textRenderer, Text.literal(label).formatted(Formatting.BOLD),
-                confirmR[0] + (confirmR[2] - textRenderer.getWidth(label)) / 2,
+        NewFont.draw(c, textRenderer, Text.literal(label).formatted(Formatting.BOLD),
+                confirmR[0] + (confirmR[2] - NewFont.width(textRenderer, label)) / 2,
                 confirmR[1] + (confirmR[3] - textRenderer.fontHeight) / 2, can ? NewUi.TXT : NewUi.TXT_DIM, false);
         centerText(c, Text.literal("You can change this later: Mod Menu > gear (top bar) > device icon"),
                 width / 2, confirmR[1] + confirmR[3] + sl(24), NewUi.TXT_DIM);
@@ -242,11 +242,13 @@ public final class NewDeviceSelectorScreen extends Screen {
         for (int i = 0; i < 3; i++) {
             int[] r = cardR[i];
             if (NewUi.in(mx, my, r[0], r[1] - sl(10), r[2], r[3] + sl(10))) {
+                NewUi.click(client);
                 selected = i;
                 return true;
             }
         }
         if (selected >= 0 && NewUi.in(mx, my, confirmR[0], confirmR[1], confirmR[2], confirmR[3])) {
+            NewUi.click(client);
             rippleStart = System.nanoTime();
             rippleX = (int) mx;
             rippleY = (int) my;

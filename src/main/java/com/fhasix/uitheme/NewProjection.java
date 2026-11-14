@@ -68,6 +68,11 @@ final class NewProjection {
         return true;
     }
 
+    /** Camera position of this frame (valid after a successful begin()). */
+    Vec3d eyePos() {
+        return new Vec3d(ex, ey, ez);
+    }
+
     /** {x, y} in scaled GUI pixels, or null when the point is behind the camera or far off screen. */
     int[] project(double x, double y, double z) {
         double dx = x - ex;

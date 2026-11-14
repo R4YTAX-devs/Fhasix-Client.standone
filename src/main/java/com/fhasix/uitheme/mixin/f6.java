@@ -11,6 +11,7 @@ import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Drawable;
 import net.minecraft.client.gui.Element;
+import com.fhasix.uitheme.NewFont;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
@@ -43,6 +44,29 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(TitleScreen.class)
 public abstract class f6 extends Screen {
 
+    // Main buttons (Singleplayer ... Store): everything is a fraction of the screen HEIGHT, measured from the
+    // reference (251x44 px buttons, 55 px step, first top at y=311 on a 1365x767 screen). Sizing from the height
+    // - not the width - keeps the buttons the same shape on every aspect ratio (wide phone screens included).
+    /**
+     * Main buttons: width is a fraction of the screen WIDTH (the reference button is 18.4% of its screen's width),
+     * height/gap/top are fractions of the screen HEIGHT. Tune these four numbers to resize everything:
+     * a bigger MAIN_HEIGHT_FRAC makes the buttons taller (fatter), a bigger MAIN_WIDTH_FRAC makes them wider.
+     */
+    private static final Identifier ICON_PERSON = Identifier.of("fhasixuitheme", "textures/gui/title/icon_person.png");
+    private static final Identifier ICON_PEOPLE = Identifier.of("fhasixuitheme", "textures/gui/title/icon_people.png");
+    private static final Identifier ICON_STAR = Identifier.of("fhasixuitheme", "textures/gui/title/icon_star.png");
+    private static final Identifier ICON_SHIRT = Identifier.of("fhasixuitheme", "textures/gui/title/icon_shirt.png");
+    private static final Identifier ICON_STORE = Identifier.of("fhasixuitheme", "textures/gui/title/icon_store.png");
+    private static final float MAIN_WIDTH_FRAC = 0.19f;
+    private static final float MAIN_HEIGHT_FRAC = 0.0685f;
+    private static final float MAIN_GAP_FRAC = 0.0155f;
+    private static final float MAIN_TOP_FRAC = 0.34f;
+    /** Logo width as a fraction of the main button width (was 0.74 = too big; original 0.55), and its gap above the buttons. */
+    private static final float LOGO_WIDTH_OF_BUTTON = 0.62f;
+    private static final float LOGO_GAP_FRAC = 0.03f;
+
+    // Old metrics: still used by the top bar (icon row + Account pill), the Quit button and the logo, so those
+    // stay exactly where and how big they were.
     private static final float BUTTON_WIDTH_FRAC = 0.19f;
     private static final float BUTTON_HEIGHT_FRAC = 0.06f;
     private static final float BUTTON_GAP_FRAC = 0.016f;
@@ -68,10 +92,10 @@ public abstract class f6 extends Screen {
 
     private static final Identifier BACKGROUND_TEXTURE =
             Identifier.of("fhasixuitheme", "textures/gui/title/background.png");
-    private static final Identifier FHASIX_LOGO =
-            Identifier.of("fhasixuitheme", "textures/gui/title/fhasix_logo.png");
     private static final int BACKGROUND_TEX_W = 1584;
     private static final int BACKGROUND_TEX_H = 672;
+    private static final Identifier FHASIX_LOGO =
+            Identifier.of("fhasixuitheme", "textures/gui/title/fhasix_logo.png");
     private static final int LOGO_TEX_W = 1251;
     private static final int LOGO_TEX_H = 323;
 
@@ -120,41 +144,55 @@ public abstract class f6 extends Screen {
             }
         }
 
+        // Old metrics (top bar, Quit button) - unchanged.
         int width = Math.round(this.width * BUTTON_WIDTH_FRAC) - BUTTON_WIDTH_TRIM_PX;
         int height = Math.round(this.height * BUTTON_HEIGHT_FRAC);
         int gap = Math.round(this.height * BUTTON_GAP_FRAC);
-        int x = this.width / 2 - width / 2;
-        int startY = Math.round(this.height * FIRST_BUTTON_TOP_FRAC);
-        int step = height + gap;
+        int oldStartY = Math.round(this.height * FIRST_BUTTON_TOP_FRAC);
+        int oldStep = height + gap;
+
+        // New metrics for the five main buttons.
+        int mainW = Math.round(this.width * MAIN_WIDTH_FRAC);
+        int mainH = Math.round(this.height * MAIN_HEIGHT_FRAC);
+        int mainGap = Math.round(this.height * MAIN_GAP_FRAC);
+        int x = this.width / 2 - mainW / 2;
+        int startY = Math.round(this.height * MAIN_TOP_FRAC);
+        int step = mainH + mainGap;
 
         this.addDrawableChild(new b2(
-                x, startY, width, height, Text.translatable("menu.singleplayer"),
-                press -> this.client.setScreen(new SelectWorldScreen(self))
+                x, startY, mainW, mainH, Text.translatable("menu.singleplayer"),
+                press -> this.client.setScreen(new SelectWorldScreen(self)),
+                0, ICON_PERSON, "Singleplayer", false
         ));
         this.addDrawableChild(new b2(
-                x, startY + step, width, height, Text.translatable("menu.multiplayer"),
-                press -> this.client.setScreen(new MultiplayerScreen(self))
+                x, startY + step, mainW, mainH, Text.translatable("menu.multiplayer"),
+                press -> this.client.setScreen(new MultiplayerScreen(self)),
+                0, ICON_PEOPLE, "Multiplayer", false
         ));
         this.addDrawableChild(new b2(
-                x, startY + step * 2, width, height, Text.literal("Discover"),
-                press -> this.client.setScreen(new DiscoverScreen(self))
+                x, startY + step * 2, mainW, mainH, Text.literal("Partnered Servers"),
+                press -> this.client.setScreen(new DiscoverScreen(self)),
+                0, ICON_STAR, "Partnered Servers", false
         ));
         this.addDrawableChild(new b2(
-                x, startY + step * 3, width, height, Text.literal("Cosmetics"),
-                press -> this.client.setScreen(new CosmeticsScreen(self))
+                x, startY + step * 3, mainW, mainH, Text.literal("Cosmetics"),
+                press -> this.client.setScreen(new CosmeticsScreen(self)),
+                0, ICON_SHIRT, "Cosmetics", false
         ));
         this.addDrawableChild(new b2(
-                x, startY + step * 4, width, height, Text.literal("Store"),
+                x, startY + step * 4, mainW, mainH, Text.literal("Store"),
                 press -> this.client.setScreen(new StoreScreen(self)),
-                b2.RED_NORMAL_LEFT, b2.RED_NORMAL_RIGHT,
-                b2.RED_HOVER_LEFT, b2.RED_HOVER_RIGHT
+                1, ICON_STORE, "Store", true
         ));
 
-        int quitWidth = Math.round(width * QUIT_WIDTH_SCALE);
+        // Quit: same height as the main buttons, 79% of their width, and two button-heights below Store
+        // (measured from the reference).
+        int quitWidth = Math.round(mainW * QUIT_WIDTH_SCALE);
+        int quitHeight = mainH;
         int quitX = this.width / 2 - quitWidth / 2;
-        int quitY = startY + step * 4 + height + Math.round(this.height * QUIT_TOP_GAP_FRAC);
+        int quitY = startY + step * 4 + mainH + mainH * 2;
         this.addDrawableChild(new d4(
-                quitX, quitY, quitWidth, height, Text.literal("Quit Game"),
+                quitX, quitY, quitWidth, quitHeight, Text.literal("Quit Game"),
                 press -> this.client.scheduleStop()
         ));
 
@@ -171,7 +209,7 @@ public abstract class f6 extends Screen {
         // Account pill - username only, no skin head - sits directly left of the icon row.
         String username = this.client.getSession().getUsername();
         int accountPadding = Math.round(iconSize * ACCOUNT_PADDING_FRACTION);
-        int accountTextWidth = this.client.textRenderer.getWidth(username);
+        int accountTextWidth = NewFont.width(this.client.textRenderer, username);
         int accountWidth = accountTextWidth + accountPadding * 2;
         int accountX = iconStartX - iconGap - accountWidth;
         this.addDrawableChild(new b2(
@@ -199,6 +237,8 @@ public abstract class f6 extends Screen {
                         } else if (icon == c3.Icon.GRID) {
                             // v30: opens the Mod Menu grid (the launcher itself is in-world only)
                             client.setScreen(new com.fhasix.uitheme.NewModMenuScreen(self));
+                        } else if (icon == c3.Icon.ARCHIVE) {
+                            client.setScreen(new com.fhasix.uitheme.ResourcePacksScreen(self));
                         } else {
                             client.setScreen(new com.fhasix.uitheme.WorldOnlyBannerScreen(self));
                         }
@@ -241,15 +281,15 @@ public abstract class f6 extends Screen {
             backgroundFilterApplied = true;
         }
 
-        context.drawTexture(RenderPipelines.GUI_TEXTURED, BACKGROUND_TEXTURE, 0, 0, 0, 0,
-                this.width, this.height, BACKGROUND_TEX_W, BACKGROUND_TEX_H, BACKGROUND_TEX_W, BACKGROUND_TEX_H);
+        // UPDATE 42: the moving panorama instead of the single still picture (BACKGROUND_TEXTURE stays unused)
+        com.fhasix.uitheme.FhasixPanorama.draw(context, this.width, this.height);
 
         int buttonWidth = Math.round(this.width * BUTTON_WIDTH_FRAC) - BUTTON_WIDTH_TRIM_PX;
         int buttonHeight = Math.round(this.height * BUTTON_HEIGHT_FRAC);
-        int logoWidth = Math.round(buttonWidth * 0.56f);
+        int logoWidth = Math.round(Math.round(this.width * MAIN_WIDTH_FRAC) * LOGO_WIDTH_OF_BUTTON);
         int logoHeight = Math.round(logoWidth * (float) LOGO_TEX_H / LOGO_TEX_W);
         int logoX = (this.width - logoWidth) / 2;
-        int logoY = Math.round(this.height * FIRST_BUTTON_TOP_FRAC) - logoHeight - Math.round(this.height * 0.025f);
+        int logoY = Math.round(this.height * MAIN_TOP_FRAC) - logoHeight - Math.round(this.height * LOGO_GAP_FRAC) - 1; // 1 GUI unit = 2 screen pixels up
         context.drawTexture(RenderPipelines.GUI_TEXTURED, FHASIX_LOGO, logoX, logoY, 0, 0,
                 logoWidth, logoHeight, LOGO_TEX_W, LOGO_TEX_H, LOGO_TEX_W, LOGO_TEX_H);
 

@@ -105,7 +105,7 @@ public class c3 extends ButtonWidget {
             case GEM:
                 return "SKINS";
             case ARCHIVE:
-                return "FILES";
+                return "RESOURCE PACKS";
             case LIST:
                 return "MINECRAFT";
             default:
@@ -122,7 +122,7 @@ public class c3 extends ButtonWidget {
         float e = 1f - (1f - tipT) * (1f - tipT) * (1f - tipT); // ease-out cubic
 
         int padX = 10;
-        int w = tr.getWidth(label) + padX * 2;
+        int w = NewFont.width(tr, label) + padX * 2;
         int h = tr.fontHeight + 12;
         int screenW = MinecraftClient.getInstance().getWindow().getScaledWidth();
         int px = Math.max(4, Math.min(screenW - w - 4, x + size / 2 - w / 2));
@@ -133,8 +133,8 @@ public class c3 extends ButtonWidget {
                 new int[]{31, 32, 36}, new int[]{22, 23, 26}, alpha, 8);
         int textAlpha = Math.round(255f * e);
         if (textAlpha >= 8) {
-            context.drawText(tr, label, px + padX, py + (h - tr.fontHeight) / 2,
-                    (textAlpha << 24) | 0xE9E9EC, false);
+            NewFont.draw(context, tr, label, px + padX, py + (h - tr.fontHeight) / 2 + NewFont.Y_FIX,
+                    (textAlpha << 24) | 0xE9E9EC, true);
         }
     }
 }

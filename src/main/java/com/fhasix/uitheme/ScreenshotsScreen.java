@@ -576,7 +576,7 @@ public class ScreenshotsScreen extends Screen {
     private void drawHeader(DrawContext c) {
         int titleX = panelX - Math.round(panelW * 0.14f);
         int titleY = panelY - Math.round(height * 0.105f);
-        c.drawText(textRenderer, "SCREENSHOTS", titleX, titleY, 0xFFF0F0F0, false);
+        NewFont.draw(c, textRenderer, "SCREENSHOTS", titleX, titleY, 0xFFF0F0F0, false);
     }
 
     private void drawExit(DrawContext c) {
@@ -1190,11 +1190,11 @@ public class ScreenshotsScreen extends Screen {
     // =========================================================================================
 
     private void drawStr(DrawContext c, String s, int x, int y, int color) {
-        c.drawText(textRenderer, s, x, y, color, false);
+        NewFont.draw(c, textRenderer, s, x, y, color, false);
     }
 
     private int strW(String s) {
-        return textRenderer.getWidth(s);
+        return NewFont.width(textRenderer, s);
     }
 
     private String ellipsize(String s, int maxW) {

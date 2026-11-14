@@ -141,9 +141,9 @@ public final class NewLauncherScreen extends Screen {
         c.drawTexture(RenderPipelines.GUI_TEXTURED, MARK, mark[0], mark[1], 0, 0, mark[2], mark[3],
                 MARK_TEX, MARK_TEX, MARK_TEX, MARK_TEX);
         int tx = mark[0] + mark[2] + sl(18);
-        c.drawText(textRenderer, Text.literal("FHASIX").formatted(Formatting.BOLD), tx,
+        NewFont.draw(c, textRenderer, Text.literal("FHASIX").formatted(Formatting.BOLD), tx,
                 mark[1] + mark[3] / 2 - textRenderer.fontHeight - sl(2), NewUi.TXT, false);
-        c.drawText(textRenderer, "Mod launcher", tx, mark[1] + mark[3] / 2 + sl(4), NewUi.TXT_DIM, false);
+        NewFont.draw(c, textRenderer, "Mod launcher", tx, mark[1] + mark[3] / 2 + sl(4), NewUi.TXT_DIM, false);
 
         boolean ch = NewUi.in(mx, my, closeBtn[0], closeBtn[1], closeBtn[2], closeBtn[3]);
         NewUi.frame(c, closeBtn[0], closeBtn[1], closeBtn[2], closeBtn[3], rad, NewUi.BTN_BORDER,
@@ -160,14 +160,14 @@ public final class NewLauncherScreen extends Screen {
         // primary button
         boolean ph = NewUi.in(mx, my, primary[0], primary[1], primary[2], primary[3]);
         NewUi.rrect(c, primary[0], primary[1], primary[2], primary[3], rad,
-                ph ? NewUi.RED_HT : NewUi.RED_T, ph ? NewUi.RED_HB : NewUi.RED_B);
+                ph ? NewUi.redHT() : NewUi.redT(), ph ? NewUi.redHB() : NewUi.redB());
         Text label = Text.literal("OPEN MOD MENU").formatted(Formatting.BOLD);
         int ico = Math.max(9, sl(28));
-        int lw = textRenderer.getWidth(label);
+        int lw = NewFont.width(textRenderer, label);
         int total = ico + sl(10) + lw;
         int gx = primary[0] + (primary[2] - total) / 2;
         NewUi.icon(c, NewUi.ICON_GRID, gx, primary[1] + (primary[3] - ico) / 2, ico);
-        c.drawText(textRenderer, label, gx + ico + sl(10), primary[1] + (primary[3] - textRenderer.fontHeight) / 2, NewUi.TXT, false);
+        NewFont.draw(c, textRenderer, label, gx + ico + sl(10), primary[1] + (primary[3] - textRenderer.fontHeight) / 2, NewUi.TXT, false);
 
         // placeholder icon buttons (hover only)
         for (int i = 0; i < ICONS.length; i++) {
@@ -189,7 +189,7 @@ public final class NewLauncherScreen extends Screen {
         String hint = boxes.isEmpty()
                 ? "Enable a HUD mod to place it on screen   -   Right Shift to close"
                 : "Drag the HUD boxes to move them   -   Right Shift to close";
-        c.drawText(textRenderer, hint, (width - textRenderer.getWidth(hint)) / 2,
+        NewFont.draw(c, textRenderer, hint, (width - NewFont.width(textRenderer, hint)) / 2,
                 panel[1] + panel[3] + sl(26), NewUi.TXT_DIM, false);
     }
 
@@ -222,10 +222,12 @@ public final class NewLauncherScreen extends Screen {
             }
         }
         if (NewUi.in(mx, my, closeBtn[0], closeBtn[1], closeBtn[2], closeBtn[3])) {
+            NewUi.click(client);
             client.setScreen(null);
             return true;
         }
         if (NewUi.in(mx, my, primary[0], primary[1], primary[2], primary[3])) {
+            NewUi.click(client);
             client.setScreen(new NewModMenuScreen(null));
             return true;
         }

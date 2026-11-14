@@ -19,6 +19,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * changes the texture AND the model type everywhere at once (name verified against the 1.21.11
  * mappings: renamed from getSkinTextures in 1.21.9).
  *
+ * The equipped FHASIX cape is layered on top here too (FhasixCapeSkin): vanilla's own cape renderer then draws it.
+ *
  * require = 0 on purpose: if a future version moves or renames the method the injection is
  * skipped instead of crashing the game at startup - the skin simply won't apply.
  */
@@ -36,7 +38,11 @@ public abstract class skin {
                 return;
             }
             SkinTextures replaced = FhasixSkins.activeSkin(client, cir.getReturnValue());
-            if (replaced != null) {
+            SkinTextures shown = replaced != null ? replaced : cir.getReturnValue();
+            SkinTextures withCape = com.fhasix.uitheme.FhasixCapeSkin.apply(shown); // equipped FHASIX cape
+            if (withCape != null) {
+                cir.setReturnValue(withCape);
+            } else if (replaced != null) {
                 cir.setReturnValue(replaced);
             }
         } catch (Exception | LinkageError t) {
