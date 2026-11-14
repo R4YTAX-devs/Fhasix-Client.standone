@@ -2,7 +2,6 @@ package com.fhasix.loader;
 
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 
@@ -12,8 +11,8 @@ import java.util.List;
 public final class UpdateScreen extends Screen {
     private final Screen next;
     private final Updater up = FhasixLoader.UPDATER;
-    private ButtonWidget primary;
-    private ButtonWidget secondary;
+    private RedButton primary;
+    private RedButton secondary;
 
     public UpdateScreen(Screen next) {
         super(Text.literal("FHASIX Update"));
@@ -25,10 +24,9 @@ public final class UpdateScreen extends Screen {
         int w = 200, h = 20;
         int x = this.width / 2 - w / 2;
         int y = this.height / 2 + 24;
-        primary = this.addDrawableChild(ButtonWidget.builder(Text.literal("Update"), b -> onPrimary())
-                .dimensions(x, y, w, h).build());
-        secondary = this.addDrawableChild(ButtonWidget.builder(Text.literal("Continue without updating"),
-                b -> this.client.setScreen(next)).dimensions(x, y + 26, w, h).build());
+        primary = this.addDrawableChild(new RedButton(x, y, w, h, Text.literal("Update"), b -> onPrimary()));
+        secondary = this.addDrawableChild(new RedButton(x, y + 26, w, h,
+                Text.literal("Continue without updating"), b -> this.client.setScreen(next)));
         refreshButtons();
     }
 
@@ -71,10 +69,14 @@ public final class UpdateScreen extends Screen {
 
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, this.width, this.height, 0xFF0A0C10);
+        context.fill(0, 0, this.width, this.height, 0xFF070708);
         int pw = Math.min(this.width - 20, 320);
         int x0 = this.width / 2 - pw / 2;
-        context.fill(x0, this.height / 2 - 78, x0 + pw, this.height / 2 + 84, 0xFF12151B);
+        int y0 = this.height / 2 - 78;
+        int y1 = this.height / 2 + 84;
+        context.fill(x0, y0, x0 + pw, y1, 0xFFB3262B);
+        context.fill(x0 + 1, y0 + 1, x0 + pw - 1, y1 - 1, 0xFF101012);
+        context.fill(x0 + 1, y0 + 1, x0 + pw - 1, y0 + 3, 0xFFE13B3E);
     }
 
     @Override
@@ -83,11 +85,11 @@ public final class UpdateScreen extends Screen {
         int cx = this.width / 2;
         int pw = Math.min(this.width - 20, 320);
 
-        center(context, "FHASIX CLIENT", cx, this.height / 2 - 66, 0xFFFFFFFF);
+        center(context, "FHASIX CLIENT", cx, this.height / 2 - 62, 0xFFE13B3E);
 
         String line1;
         String line2 = "";
-        int color2 = 0xFF9AA0A8;
+        int color2 = 0xFF9A9A9F;
         switch (up.state) {
             case CHECKING -> line1 = "Checking for updates...";
             case NEEDS_UPDATE -> {
@@ -105,7 +107,7 @@ public final class UpdateScreen extends Screen {
             case ERROR -> {
                 line1 = "Something went wrong";
                 line2 = up.message;
-                color2 = 0xFFFF7A7A;
+                color2 = 0xFFFF8A8A;
             }
             default -> line1 = "";
         }
@@ -124,8 +126,8 @@ public final class UpdateScreen extends Screen {
             int bw = pw - 40;
             int bx = cx - bw / 2;
             int by = this.height / 2 + 6;
-            context.fill(bx, by, bx + bw, by + 6, 0xFF262B33);
-            context.fill(bx, by, bx + Math.round(bw * up.progress), by + 6, 0xFF4F8CFF);
+            context.fill(bx, by, bx + bw, by + 6, 0xFF2A1416);
+            context.fill(bx, by, bx + Math.round(bw * up.progress), by + 6, 0xFFE13B3E);
         }
     }
 
