@@ -15,12 +15,27 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Entity.class)
 public abstract class NewLookMixin {
 
+    private static boolean fhasix$scaling = false;
+
     @Inject(method = "changeLookDirection", at = @At("HEAD"), cancellable = true, require = 0)
     private void fhasix$freelook(double cursorDeltaX, double cursorDeltaY, CallbackInfo ci) {
         try {
             if (NewCamera.freelookActive() && (Object) this instanceof ClientPlayerEntity) {
                 NewCamera.look(cursorDeltaX, cursorDeltaY);
                 ci.cancel();
+                return;
+            }
+            if (!fhasix$scaling && (Object) this instanceof ClientPlayerEntity) {
+                double scale = com.fhasix.uitheme.NewZoom.sensitivityScale();
+                if (scale < 0.999) {
+                    fhasix$scaling = true;
+                    try {
+                        ((Entity) (Object) this).changeLookDirection(cursorDeltaX * scale, cursorDeltaY * scale);
+                    } finally {
+                        fhasix$scaling = false;
+                    }
+                    ci.cancel();
+                }
             }
         } catch (Exception | LinkageError t) {
             com.fhasix.uitheme.NewSafe.failed("look_mixin", t);

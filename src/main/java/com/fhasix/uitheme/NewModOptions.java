@@ -253,6 +253,14 @@ final class NewModOptions {
         fv.add(slider("fov", "Field of view", 110, 30, 180, 1, "\u00b0"));
         BY_MOD.put("fov_changer", fv);
 
+        List<Opt> zm = new ArrayList<>();
+        zm.add(slider("level", "Zoom level", 4, 2, 20, 1, "x"));
+        zm.add(toggle("anim", "Zoom animation", true));
+        zm.add(choice("style", "Animation style", 0, "Smooth", "Normal"));
+        zm.add(slider("smooth", "Smoothness", 5, 1, 10, 1, ""));
+        zm.add(toggle("sens", "Lower sensitivity while zoomed", true));
+        BY_MOD.put("zoom", zm);
+
         List<Opt> tc = new ArrayList<>();
         tc.add(slider("time", "Time of day", 6000, 0, 24000, 250, ""));
         BY_MOD.put("time_changer", tc);

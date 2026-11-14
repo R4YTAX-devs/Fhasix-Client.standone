@@ -78,6 +78,7 @@ public final class NewModSettings {
             new ModDef("no_scoreboard", "No Scoreboard", TAG_HUD, true, true, 28),
             new ModDef("full_bright", "Full Bright", 0, true, true, 29),
             new ModDef("fov_changer", "FOV Changer", 0, true, true, 30),
+            new ModDef("zoom", "Zoom", TAG_PVP, false, true, 56),
             new ModDef("time_changer", "Time Changer", 0, true, true, 31),
             new ModDef("weather_changer", "Weather Changer", 0, true, true, 32),
             new ModDef("tnt_timer", "TNT Timer", TAG_PVP, true, true, 33),

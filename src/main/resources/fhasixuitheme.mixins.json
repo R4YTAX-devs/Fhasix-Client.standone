@@ -9,6 +9,7 @@
     "skin",
     "NewCameraMixin",
     "NewLookMixin",
+    "NewZoomMixin",
     "NewCrashMixin",
     "NewHandMixin",
     "NewItemStateMixin",

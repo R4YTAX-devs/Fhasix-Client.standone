@@ -26,7 +26,7 @@ public final class UpdateScreen extends Screen {
         int y = this.height / 2 + 24;
         primary = this.addDrawableChild(new RedButton(x, y, w, h, Text.literal("Update"), b -> onPrimary()));
         secondary = this.addDrawableChild(new RedButton(x, y + 26, w, h,
-                Text.literal("Continue without updating"), b -> this.client.setScreen(next)));
+                Text.literal("Quit game"), b -> this.client.scheduleStop()));
         refreshButtons();
     }
 
@@ -48,7 +48,7 @@ public final class UpdateScreen extends Screen {
             case DONE -> setPrimary(true, "Close game");
             default -> setPrimary(false, "");
         }
-        secondary.visible = s == Updater.State.ERROR && up.canContinue;
+        secondary.visible = s == Updater.State.ERROR;
         secondary.active = secondary.visible;
     }
 
