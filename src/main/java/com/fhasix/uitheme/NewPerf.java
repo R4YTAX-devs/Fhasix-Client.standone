@@ -52,13 +52,14 @@ public final class NewPerf {
     static final int TEXTURE = 11;
     static final int MENU = 12;
     static final int FOG = 13;
-    static final int COUNT = 14;
+    static final int BOOST = 14;
+    static final int COUNT = 15;
 
     static final String[] IDS = {"particles", "culling", "lazy", "render", "sim", "entity", "visual",
-            "frame", "effects", "hud", "background", "texture", "menu", "fog"};
+            "frame", "effects", "hud", "background", "texture", "menu", "fog", "boost"};
     static final String[] LABELS = {"Particles", "Culling", "Lazy Chunk Loading", "Render Distance",
             "Simulation Distance", "Entity Detail", "Visual Details", "Frame Rate", "Effects & Animations",
-            "HUD Optimizer", "Background Limiter", "Texture Detail", "Menu FPS Saver", "Fog Optimizer"};
+            "HUD Optimizer", "Background Limiter", "Texture Detail", "Menu FPS Saver", "Fog Optimizer", "Extra Boost"};
     static final String[] LEVELS = {"Small", "Medium", "High"};
     static final String[][] DESC = {
             {"Hides potion and spell effect particles.",
@@ -102,18 +103,22 @@ public final class NewPerf {
                     "Caps the frame rate at 15 while a menu is open. Gameplay FPS is not touched."},
             {"Brings the fog in to 60% of its distance, with the normal fog colour, so far chunks are hidden early. More FPS.",
                     "Brings the fog in to 60% of its distance, with the normal fog colour, so far chunks are hidden early. More FPS.",
-                    "Brings the fog in to 60% of its distance, with the normal fog colour, so far chunks are hidden early. More FPS."}
+                    "Brings the fog in to 60% of its distance, with the normal fog colour, so far chunks are hidden early. More FPS."},
+            {"Always on. Runs the fastest graphics set: fast graphics, culling, lean entities and visuals. It cannot be turned off.",
+                    "Always on. Runs the fastest graphics set: fast graphics, culling, lean entities and visuals. It cannot be turned off.",
+                    "Always on. Runs the fastest graphics set: fast graphics, culling, lean entities and visuals. It cannot be turned off."}
     };
     /** Which tab of the Performance screen a mode is on: 1 = World, 2 = Video, 3 = System. */
-    static final int[] TAB = {1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 2, 3, 2};
-    static final int[] ICON = {37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 49};
-    static final boolean[] NEWBADGE = {false, false, false, false, false, false, false, true, true, true, true, true, true, false};
+    static final int[] TAB = {1, 0, 0, 1, 1, 0, 0, 3, 0, 0, 0, 2, 0, 0, 2};
+    static final int[] ICON = {37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 49, 44};
+    static final boolean[] NEWBADGE = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, true};
 
     /** Modes that are a single On/Off switch (no Low / Medium / High): the Fog Optimizer. */
     static final boolean[] TOGGLE_ONLY = new boolean[COUNT];
 
     static {
         TOGGLE_ONLY[FOG] = true;
+        TOGGLE_ONLY[BOOST] = true;
     }
 
     /** One card per mode in the Performance view of the Mod Menu (ids are "perf_" + mode id). */
@@ -167,11 +172,40 @@ public final class NewPerf {
         }
     }
 
+    /**
+     * Modes that never raised FPS (UI fades, menu-only limits, thread priority, a fog tweak that cannot show up, and
+     * delayed chunk loading, which only makes loading arrive in bursts). Hidden and always off.
+     */
+    static final boolean[] HIDDEN = new boolean[COUNT];
+
+    static {
+        HIDDEN[LAZY] = true;
+        HIDDEN[EFFECTS] = true;
+        HIDDEN[HUD] = true;
+        HIDDEN[BACKGROUND] = true;
+        HIDDEN[MENU] = true;
+        HIDDEN[FOG] = true;
+    }
+
+    /** Extra Boost = Culling + Entity Detail + Visual Details, always on at their fastest level. */
+    private static boolean inBoost(int mode) {
+        return mode == BOOST || mode == CULLING || mode == ENTITY || mode == VISUAL;
+    }
+
     static boolean on(MinecraftClient c, int mode) {
+        if (HIDDEN[mode]) {
+            return false;
+        }
+        if (inBoost(mode)) {
+            return true;
+        }
         return NewModSettings.optBool(c, MOD, IDS[mode] + ".on");
     }
 
     static int level(MinecraftClient c, int mode) {
+        if (mode == CULLING || mode == ENTITY || mode == VISUAL) {
+            return 2; // Extra Boost: the fastest level
+        }
         return Math.max(0, Math.min(2, NewModSettings.opt(c, MOD, IDS[mode] + ".lvl")));
     }
 

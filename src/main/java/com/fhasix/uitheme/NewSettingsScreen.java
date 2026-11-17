@@ -341,6 +341,26 @@ final class NewSettingsScreen extends Screen {
             profiles.drawPopup(c, mx, my);
             profiles.drawToast(c);
         }
+        drawPerfToast(c);
+    }
+
+    /** Short notice on the Performance page (Extra Boost cannot be switched off). */
+    private String perfToast;
+    private long perfToastUntil;
+
+    private void drawPerfToast(DrawContext c) {
+        long now = System.currentTimeMillis();
+        if (perfToast == null || now >= perfToastUntil) {
+            return;
+        }
+        float a = Math.min(1f, (perfToastUntil - now) / 400f);
+        float sz = fs(15f);
+        int w = tw(perfToast, NewFont.W_BOLD, sz) + sl(44);
+        int h = Math.max(14, sl(38));
+        int x = panel[0] + (panel[2] - w) / 2;
+        int y = panel[1] + sl(560);
+        NewUi.rrect(c, x, y, w, h, h / 2, NewUi.withAlpha(NewUi.rgb(8, 9, 12), 0.94f * a), NewUi.withAlpha(NewUi.rgb(8, 9, 12), 0.94f * a));
+        text(c, perfToast, x + sl(22), NewFont.centerYUi(y, h, sz), NewUi.withAlpha(0xFFFFFFFF, a), NewFont.W_BOLD, sz);
     }
 
     private void tickScroll(long now) {
@@ -952,7 +972,12 @@ final class NewSettingsScreen extends Screen {
         } else if (kind == K_TOGGLE) {
             NewUi.click(client);
             Item it = secs.get(a / 100).items.get(a % 100);
-            NewPerf.setOn(client, it.index, !NewPerf.on(client, it.index));
+            if (it.index == NewPerf.BOOST) {
+                perfToast = "Extra Boost can't be turned off";
+                perfToastUntil = System.currentTimeMillis() + 2600L;
+            } else {
+                NewPerf.setOn(client, it.index, !NewPerf.on(client, it.index));
+            }
         } else if (kind == K_SEG) {
             NewUi.click(client);
             Item it = secs.get(a / 100).items.get(a % 100);
