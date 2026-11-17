@@ -1,8 +1,8 @@
 # FHASIX Minecraft 1.21.11: build mod + loader, publish to the GitHub repo, then VERIFY the upload.
-# Usage: bash release.sh 5.4        (Termux; everything else is set up automatically)
+# Usage: bash release.sh 5.5        (Termux; everything else is set up automatically)
 set -eo pipefail
 cd "$(dirname "$0")"
-V="${1:-5.4}"; V="${V#v}"; N="$V"
+V="${1:-5.5}"; V="${V#v}"; N="$V"
 JV=21
 REPO="$HOME/Fhasix-Client.standone"
 URL="https://github.com/R4YTAX-devs/Fhasix-Client.standone.git"

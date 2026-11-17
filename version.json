@@ -1,6 +1,6 @@
 {
-  "version": "5.4",
-  "jar": "dist/fhasix-client-5.4.jar",
-  "sha256": "7633fd28cc220b7d317a83419bffa899db4da8e583bdff36701650f3ec67e51a",
-  "size": 6180900
+  "version": "5.5",
+  "jar": "dist/fhasix-client-5.5.jar",
+  "sha256": "67905d54939b281d7e5de2c4febcb9e8676df58f324850bd449f4e2dfe8d95df",
+  "size": 6181058
 }
