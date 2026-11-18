@@ -83,3 +83,9 @@ Fix with the smallest change and keep behavior.
 ## Update 11 (overhead check)
 - Crash-shield wrappers no longer allocate anything per frame (State kept per wrapper, inline try/catch on hot paths, HUD element keys built once).
 - Performance mode checks in the particle / entity-culling hot paths read a cached int array (refreshed every tick and on change) instead of building strings and looking up settings every call - cheaper than before.
+
+
+## 5.6 - Performance Update 2
+- 1.21.11: tighter entity culling, unlimited FPS, smooth far textures (mipmap 3-4, no flicker).
+- Culling: armor stands/items beyond 8 blocks, frames/paintings 12, mobs 20 (players stay 48) at the fastest level.
+- One-time: Frame Rate (unlimited), Texture Detail, Particles Medium and Extra Boost switched on for existing players.
