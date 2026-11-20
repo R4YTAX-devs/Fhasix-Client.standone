@@ -224,7 +224,7 @@ public abstract class f6 extends Screen {
         int accountX = iconStartX - iconGap - accountWidth;
         this.addDrawableChild(new b2(
                 accountX, iconY, accountWidth, iconSize, Text.literal(username),
-                press -> { /* not wired up yet */ },
+                press -> client.setScreen(new com.fhasix.uitheme.NewAccountsScreen(self)),
                 b2.NAVY_NORMAL_TOP_LEFT, b2.NAVY_NORMAL_BOTTOM_RIGHT,
                 b2.NAVY_HOVER_TOP_LEFT, b2.NAVY_HOVER_BOTTOM_RIGHT,
                 TOPBAR_ALPHA

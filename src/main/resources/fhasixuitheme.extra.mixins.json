@@ -1,0 +1,17 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.fhasix.uitheme.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "NewHurtCamMixin",
+    "NewLowFireMixin",
+    "NewOverlayMixin",
+    "NewPostControlMixin",
+    "NewPostPassMixin",
+    "NewSessionAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

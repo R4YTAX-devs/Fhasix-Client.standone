@@ -16,7 +16,8 @@
     ]
   },
   "mixins": [
-    "fhasixuitheme.mixins.json"
+    "fhasixuitheme.mixins.json",
+    "fhasixuitheme.extra.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.18.4",
