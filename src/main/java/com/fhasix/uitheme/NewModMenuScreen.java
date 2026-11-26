@@ -446,17 +446,10 @@ public final class NewModMenuScreen extends Screen {
 
     /** Moves a stored 0..1 value towards target (frame-rate independent); a first-seen value snaps (no animation on open). */
     private float ease(String key, float target, float speed) {
-        if (NewPerf.animationsOff()) { // HUD Optimizer: no UI animations
-            anim.put(key, target);
-            return target;
-        }
-        float cur = anim.getOrDefault(key, target);
-        cur += (target - cur) * Math.min(1f, animDt * speed);
-        if (Math.abs(target - cur) < 0.004f) {
-            cur = target;
-        }
-        anim.put(key, cur);
-        return cur;
+        // 5.9: no fade-in. Hover (and every other state) switches on and off at once. The fades that stay live in the
+        // Performance / General / Profiles pages (NewSettingsScreen) and in the per-mod settings (NewModOptionsScreen).
+        anim.put(key, target);
+        return target;
     }
 
     private static float smooth(float t) {

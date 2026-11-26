@@ -36,6 +36,10 @@ public class b2 extends ButtonWidget {
     private Identifier artIcon;
     private String artLabel;
     private boolean artUpper;
+    private float artIconFrac = 0.34f;
+    private int artIconColor = 0xFFFFFFFF;
+    private String flashText;
+    private long flashUntilMs;
 
     // hover fade + click ripple (art mode only)
     private PressAction realPress;      // the real action, run after the ripple has played
@@ -83,6 +87,20 @@ public class b2 extends ButtonWidget {
         this.artUpper = artUpper;
     }
 
+    /** Art-mode button with a bigger, tinted icon (the Discord button). */
+    public b2(int x, int y, int width, int height, net.minecraft.text.Text message, PressAction onPress,
+              int artKind, Identifier artIcon, String artLabel, boolean artUpper, float iconFrac, int iconColor) {
+        this(x, y, width, height, message, onPress, artKind, artIcon, artLabel, artUpper);
+        this.artIconFrac = iconFrac;
+        this.artIconColor = iconColor;
+    }
+
+    /** Shows another label for a moment (e.g. "Link copied"). */
+    public void flash(String text, long ms) {
+        flashText = text;
+        flashUntilMs = System.currentTimeMillis() + ms;
+    }
+
     /** Called when the button is pressed: start the ripple and run the real action a moment later. */
     private void startRipple() {
         if (pending) return;
@@ -124,7 +142,8 @@ public class b2 extends ButtonWidget {
                     NewButtonArt.ripple(context, ax, ay, aw, ah, rippleX, rippleY, Math.min(1f, t / RIPPLE_S));
                 }
             }
-            NewButtonArt.label(context, ax, ay, aw, ah, artIcon, artLabel, artUpper, artKind == 1);
+            String shown = (flashText != null && System.currentTimeMillis() < flashUntilMs) ? flashText : artLabel;
+            NewButtonArt.label(context, ax, ay, aw, ah, artIcon, shown, artUpper, artKind == 1, artIconFrac, artIconColor);
             return;
         }
         int[] topLeft = hovered ? hoverLeft : normalLeft;
@@ -136,9 +155,10 @@ public class b2 extends ButtonWidget {
         // without calling super, the label must be drawn here (opaque ARGB or it is skipped).
         TextRenderer tr = MinecraftClient.getInstance().textRenderer;
         String label = this.getMessage().getString();
-        int tx = this.getX() + (this.getWidth() - NewFont.width(tr, label)) / 2;
+        float size = NewFont.pillSize(this.getHeight());
+        int tx = this.getX() + (this.getWidth() - NewFont.widthPill(tr, label, size)) / 2;
         int ty = this.getY() + (this.getHeight() - tr.fontHeight) / 2 + NewFont.Y_FIX;
-        NewFont.draw(context, tr, label, tx, ty, 0xFFFFFFFF, true);
+        NewFont.drawPill(context, tr, label, tx, ty, 0xFFFFFFFF, size);
     }
 
 }

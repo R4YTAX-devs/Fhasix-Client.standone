@@ -137,6 +137,74 @@ public final class NewFont {
         return tr.getWidth(titleText(s, inter, upper));
     }
 
+
+    // ------------------------------------------------------------ fitted title / pill text (update 5.9)
+    // The title-screen buttons are sized from the screen, so on small screens or high GUI scales the old fixed font
+    // covered the whole button. These helpers keep the exact old look at full size and step the SAME typefaces down
+    // (tf_s_NN / tf_i_NN in assets/fhasixuitheme/font) when the button is smaller, then shrink further to fit the width.
+
+    private static final Map<Integer, Style> FIT_STYLES = new HashMap<>();
+    public static final float PILL_MAX = 9.1f;
+
+    private static Style fitStyle(boolean inter, float size, float maxSize, Style exact) {
+        if (size >= maxSize - 0.01f) {
+            return exact;
+        }
+        int half = Math.max(10, Math.min(23, Math.round(size * 2f)));
+        int key = (inter ? 1000 : 0) + half;
+        Style st = FIT_STYLES.get(key);
+        if (st == null) {
+            st = Style.EMPTY.withFont(new StyleSpriteSource.Font(Identifier.of("fhasixuitheme", (inter ? "tf_i_" : "tf_s_") + half)));
+            FIT_STYLES.put(key, st);
+        }
+        return st;
+    }
+
+    private static Text fitText(String s, boolean inter, boolean upper, float size, float maxSize, Style exact) {
+        String v = s == null ? "" : s;
+        return Text.literal(upper ? v.toUpperCase(Locale.ROOT) : v).setStyle(fitStyle(inter, size, maxSize, exact));
+    }
+
+    private static float fitSizeFor(TextRenderer tr, String s, boolean inter, boolean upper, float size, float maxSize, Style exact, int maxWidth) {
+        float sz = Math.min(size, maxSize);
+        while (sz > 5.0f && tr.getWidth(fitText(s, inter, upper, sz, maxSize, exact)) > maxWidth) {
+            sz -= 0.5f;
+        }
+        return sz;
+    }
+
+    private static float titleMax(boolean inter) {
+        return inter ? 11.0f : 11.6f;
+    }
+
+    /** Title-button text size: the old size on a normal button, smaller on a small one, and always narrow enough for maxWidth. */
+    public static float titleSize(TextRenderer tr, String s, boolean inter, boolean upper, int buttonH, int maxWidth) {
+        float max = titleMax(inter);
+        return fitSizeFor(tr, s, inter, upper, Math.min(max, buttonH * 0.33f), max, titleStyle(inter), maxWidth);
+    }
+
+    public static void drawTitleSized(DrawContext c, TextRenderer tr, String s, int x, int y, int color, boolean inter, boolean upper, float size) {
+        float max = titleMax(inter);
+        c.drawText(tr, fitText(s, inter, upper, size, max, titleStyle(inter)), x, y - Math.round((max - size) * 0.35f), color, SHADOW);
+    }
+
+    public static int widthTitleSized(TextRenderer tr, String s, boolean inter, boolean upper, float size) {
+        return tr.getWidth(fitText(s, inter, upper, size, titleMax(inter), titleStyle(inter)));
+    }
+
+    /** Account-pill text size for a pill of height h (the old 9.1 unless the pill is very small). */
+    public static float pillSize(int h) {
+        return Math.min(PILL_MAX, h * 0.30f);
+    }
+
+    public static int widthPill(TextRenderer tr, String s, float size) {
+        return tr.getWidth(fitText(s, false, ALL_CAPS, size, PILL_MAX, style()));
+    }
+
+    public static void drawPill(DrawContext c, TextRenderer tr, String s, int x, int y, int color, float size) {
+        c.drawText(tr, fitText(s, false, ALL_CAPS, size, PILL_MAX, style()), x, y - Math.round((PILL_MAX - size) * 0.35f), color, false);
+    }
+
     // ------------------------------------------------------------ Mod Menu fonts (light weights, normal case)
     // Three weights (regular / medium / bold) at many sizes. The files ui_regular.ttf, ui_medium.ttf and
     // ui_bold.ttf in assets/fhasixuitheme/font/ can simply be replaced with Product Sans Regular / Medium /

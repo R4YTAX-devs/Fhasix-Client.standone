@@ -94,3 +94,10 @@ Fix with the smallest change and keep behavior.
 ## 5.7
 - New: Motion Blur (frame-rate independent, HUD stays sharp), Hit Color, No Hurt Cam, Low Fire, Minimap, Waypoints (B = save, N = list), Discord Rich Presence (PC only), Account Switcher (offline names, click your name on the title screen).
 - Auto Text now works (GG when a game ends, optional good luck at the start).
+
+
+## Update 5.9
+- Title screen: button text now follows the button size and always fits the width (it was a fixed size, so on small screens / high GUI scale it covered the whole button). Same fonts, same look at normal size. Account pill and Quit button too.
+- Title screen: the "Check in now" and news cards no longer zoom their text on hover (it jumped and misaligned); the card just brightens.
+- Account Switcher: text scales with the panel, page counter no longer sits over CLOSE, red/green status line, click sounds, Remove hidden for the account in use.
+- Mod Menu: no more hover/fade-in animation (everything switches instantly). Fades stay in the Performance / General / Profiles pages and in per-mod settings.

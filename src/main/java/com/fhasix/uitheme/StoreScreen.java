@@ -1058,7 +1058,7 @@ public class StoreScreen extends Screen {
         NewButtonArt.edge(c, r[0], r[1], r[2], r[3], rad, 0.28f);
         int cx = r[0] + r[2] / 2;
         float t1 = fs(26f);
-        String head = selling ? "Sell this cloak?" : "Buy this cloak?";
+        String head = selling ? "Sell this cloak?" : (!canConfirm() ? "Not enough points" : "Buy this cloak?");
         text(c, head, cx - tw(head, NewFont.W_BOLD, t1) / 2, NewFont.centerYUi(r[1] + sl(22), sl(44), t1), TXT, NewFont.W_BOLD, t1);
         float t2 = fs(19f);
         String name = fit(buying.name, NewFont.W_BOLD, t2, r[2] - sl(60));
@@ -1081,11 +1081,26 @@ public class StoreScreen extends Screen {
                     : "Weekly sell limit reached - it resets on Monday";
             text(c, info, cx - tw(info, NewFont.W_BOLD, t4) / 2, NewFont.centerYUi(r[1] + sl(208), sl(26), t4), left > 0 ? TXT_SOFT : ERR_COLOR, NewFont.W_BOLD, t4);
         } else {
-            String have = "Your points: " + FhasixPoints.format(FhasixPoints.balance());
-            text(c, have, cx - tw(have, NewFont.W_MED, t4) / 2, NewFont.centerYUi(r[1] + sl(180), sl(26), t4), TXT_GREY, NewFont.W_MED, t4);
+            long bal = FhasixPoints.balance();
+            String have = "Your points: " + FhasixPoints.format(bal);
             if (!ok) {
-                String need = "You need " + FhasixPoints.format(buying.price - FhasixPoints.balance()) + " more points";
-                text(c, need, cx - tw(need, NewFont.W_BOLD, t4) / 2, NewFont.centerYUi(r[1] + sl(208), sl(26), t4), ERR_COLOR, NewFont.W_BOLD, t4);
+                // not enough points: a progress bar toward the price, what you have on the left, what is missing on the right
+                int barW = sl(440);
+                int barH = Math.max(4, sl(12));
+                int barX = cx - barW / 2;
+                int barY = r[1] + sl(182);
+                int track = NewUi.rgb(32, 35, 42);
+                NewUi.rrect(c, barX, barY, barW, barH, barH / 2, track, track);
+                float frac = buying.price <= 0 ? 1f : Math.max(0f, Math.min(1f, bal / (float) buying.price));
+                if (frac > 0f) {
+                    int fillC = FhasixTheme.red();
+                    NewUi.rrect(c, barX, barY, Math.max(barH, Math.round(barW * frac)), barH, barH / 2, fillC, fillC);
+                }
+                text(c, have, barX, NewFont.centerYUi(barY + sl(20), sl(26), t4), TXT_GREY, NewFont.W_MED, t4);
+                String need = "Need " + FhasixPoints.format(buying.price - bal) + " more";
+                text(c, need, barX + barW - tw(need, NewFont.W_BOLD, t4), NewFont.centerYUi(barY + sl(20), sl(26), t4), ERR_COLOR, NewFont.W_BOLD, t4);
+            } else {
+                text(c, have, cx - tw(have, NewFont.W_MED, t4) / 2, NewFont.centerYUi(r[1] + sl(180), sl(26), t4), TXT_GREY, NewFont.W_MED, t4);
             }
         }
         int[] cancel = buyButton(false);

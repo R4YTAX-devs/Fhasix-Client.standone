@@ -19,8 +19,8 @@ public class NewBanner extends ButtonWidget {
     public static final int NEWS = 1;
 
     /** News card text. Edit these two lines for each update. */
-    private static final String NEWS_TITLE = "Update 5.7";
-    private static final String NEWS_LINE = "Motion Blur - Minimap - Waypoints";
+    private static final String NEWS_TITLE = "5.9.9 Patches";
+    private static final String NEWS_LINE = "Discord Button - New Menus";
 
     /** The same points gem the Store and Cosmetics use. */
     private static final Identifier GEM = Identifier.of("fhasixuitheme", "textures/gui/store/store_gem.png");
@@ -99,7 +99,7 @@ public class NewBanner extends ButtonWidget {
     }
 
     private void drawPoints(DrawContext c, int x, int y, int w, int h) {
-        float z = 1f + 0.08f * zoomT;                 // content zoom on hover (the card itself stays put)
+        float z = 1f;                                 // 5.9: no text/gem zoom on hover (it made the text jump and misalign); the card just brightens
         // same look as the Singleplayer / Multiplayer / Cosmetics buttons
         NewButtonArt.navy(c, x, y, w, h, zoomT);
 
@@ -135,7 +135,7 @@ public class NewBanner extends ButtonWidget {
 
     private void drawNews(DrawContext c, int x, int y, int w, int h) {
         float k = Math.max(0.2f, w / 400f);
-        float z = 1f + 0.12f * zoomT;
+        float z = 1f;                                 // 5.9: no text zoom on hover
         int rad = Math.max(3, Math.round(h * 0.06f));
         int lift = Math.round(18 * zoomT);            // the card gets a touch brighter on hover
         int top = NewUi.rgb(255, Math.min(255, 158 + lift / 2), 52);

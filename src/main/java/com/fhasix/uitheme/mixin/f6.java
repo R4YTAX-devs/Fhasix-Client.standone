@@ -57,6 +57,7 @@ public abstract class f6 extends Screen {
     private static final Identifier ICON_STAR = Identifier.of("fhasixuitheme", "textures/gui/title/icon_star.png");
     private static final Identifier ICON_SHIRT = Identifier.of("fhasixuitheme", "textures/gui/title/icon_shirt.png");
     private static final Identifier ICON_STORE = Identifier.of("fhasixuitheme", "textures/gui/title/icon_store.png");
+    private static final Identifier DISCORD_ICON = Identifier.of("fhasixuitheme", "textures/gui/title/discord_logo.png");
     private static final float MAIN_WIDTH_FRAC = 0.19f;
     private static final float MAIN_HEIGHT_FRAC = 0.0685f;
     private static final float MAIN_GAP_FRAC = 0.0155f;
@@ -219,7 +220,7 @@ public abstract class f6 extends Screen {
         // Account pill - username only, no skin head - sits directly left of the icon row.
         String username = this.client.getSession().getUsername();
         int accountPadding = Math.round(iconSize * ACCOUNT_PADDING_FRACTION);
-        int accountTextWidth = NewFont.width(this.client.textRenderer, username);
+        int accountTextWidth = NewFont.widthPill(this.client.textRenderer, username, NewFont.pillSize(iconSize));
         int accountWidth = accountTextWidth + accountPadding * 2;
         int accountX = iconStartX - iconGap - accountWidth;
         this.addDrawableChild(new b2(
@@ -229,6 +230,28 @@ public abstract class f6 extends Screen {
                 b2.NAVY_HOVER_TOP_LEFT, b2.NAVY_HOVER_BOTTOM_RIGHT,
                 TOPBAR_ALPHA
         ));
+
+        // Discord button, top-left corner (update 5.9.9): the same navy button + corner-lit edge as the main buttons,
+        // the Discord mark drawn in the Discord colour, and it sits as far from the left edge as the top row sits from the top.
+        {
+            String dText = "Join Discord";
+            int dIcon = Math.round(iconSize * 0.52f);
+            int dGap = Math.round(iconSize * 0.24f);
+            float dSize = NewFont.titleSize(this.client.textRenderer, dText, false, false, iconSize, 1000);
+            int dTextW = Math.max(NewFont.widthTitleSized(this.client.textRenderer, dText, false, false, dSize),
+                    NewFont.widthTitleSized(this.client.textRenderer, "Link copied", false, false, dSize));
+            int dW = Math.round((dIcon + dGap + dTextW) / 0.78f);
+            final b2[] dRef = new b2[1];
+            dRef[0] = new b2(iconY, iconY, dW, iconSize, Text.literal(dText),
+                    press -> {
+                        com.fhasix.uitheme.NewDiscordLink.open(client);
+                        if (dRef[0] != null) {
+                            dRef[0].flash("Link copied", 2500L);
+                        }
+                    },
+                    0, DISCORD_ICON, dText, false, 0.52f, 0xFF5865F2);
+            this.addDrawableChild(dRef[0]);
+        }
 
         for (int i = 0; i < ICON_ROW.length; i++) {
             int iconX = iconStartX + i * (iconSize + iconGap);

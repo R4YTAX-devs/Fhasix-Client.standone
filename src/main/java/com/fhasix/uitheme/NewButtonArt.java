@@ -59,16 +59,30 @@ public final class NewButtonArt {
     /** Icon (small PNG) + label in the title fonts, centred as one group. inter = Inter (Store), else Product Sans. */
     public static void label(DrawContext g, int x, int y, int w, int h, Identifier icon, String text,
                              boolean upper, boolean inter) {
+        label(g, x, y, w, h, icon, text, upper, inter, 0.34f, 0xFFFFFFFF);
+    }
+
+    /** Same, with the icon size (share of the button height) and tint colour chosen by the caller (Discord button). */
+    public static void label(DrawContext g, int x, int y, int w, int h, Identifier icon, String text,
+                             boolean upper, boolean inter, float iconFrac, int iconColor) {
         TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        int iconSize = Math.round(h * 0.34f);
+        int iconSize = Math.round(h * iconFrac);
         int gap = Math.round(h * 0.24f);
-        int tw = NewFont.widthTitle(tr, text, inter, upper);
+        // update 5.9: the text size follows the button height and always fits the width (it used to be fixed)
+        int avail = Math.max(8, w - iconSize - gap - Math.round(w * 0.12f));
+        float size = NewFont.titleSize(tr, text, inter, upper, h, avail);
+        int tw = NewFont.widthTitleSized(tr, text, inter, upper, size);
         int group = iconSize + gap + tw;
         int gx = x + (w - group) / 2;
-        g.drawTexture(RenderPipelines.GUI_TEXTURED, icon, gx, y + (h - iconSize) / 2, 0, 0,
-                iconSize, iconSize, 128, 128, 128, 128);
-        NewFont.drawTitle(g, tr, text, gx + iconSize + gap, y + (h - tr.fontHeight) / 2 + NewFont.Y_TITLE,
-                0xFFEDEDED, inter, upper);
+        if (iconColor == 0xFFFFFFFF) {
+            g.drawTexture(RenderPipelines.GUI_TEXTURED, icon, gx, y + (h - iconSize) / 2, 0, 0,
+                    iconSize, iconSize, 128, 128, 128, 128);
+        } else {
+            g.drawTexture(RenderPipelines.GUI_TEXTURED, icon, gx, y + (h - iconSize) / 2, 0, 0,
+                    iconSize, iconSize, 128, 128, 128, 128, iconColor);
+        }
+        NewFont.drawTitleSized(g, tr, text, gx + iconSize + gap, y + (h - tr.fontHeight) / 2 + NewFont.Y_TITLE,
+                0xFFEDEDED, inter, upper, size);
     }
 
     // ---------------------------------------------------------------- drawing helpers
